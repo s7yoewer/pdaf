@@ -89,6 +89,9 @@ PROGRAM pdaf_terrsysmp
         ! forward simulation of component models
         CALL integrate_tsmp()
 
+        ! assimilation step
+        CALL assimilate_pdaf()
+
         ! barrier before model integration starts
         CALL MPI_BARRIER(MPI_COMM_WORLD, MPIerr)
         IF (MPIerr .NE. MPI_SUCCESS) THEN
@@ -96,9 +99,6 @@ PROGRAM pdaf_terrsysmp
         END IF
         WRITE(*, "(a)") "Ending debug run after first assimilation step"
         CALL abort_parallel()
-
-        ! assimilation step
-        CALL assimilate_pdaf()
 
         !call MPI_BARRIER(MPI_COMM_WORLD, MPIerr)
         !print *,"Finished assimilation", tcycle
