@@ -111,7 +111,12 @@ SUBROUTINE init_dim_obs_l_pdaf(domain_p, step, dim_obs_f, dim_obs_l)
   INTEGER  :: domain_p_coord   ! Current local analysis domain for coord arrays
 
   !kuw
-  integer :: dx,dy, max_var_id, ierror
+#if defined CLMSA
+  real :: dx,dy
+#else
+  integer :: dx,dy
+#endif
+  integer :: max_var_id, ierror
   integer :: obsind(dim_obs)
   real    :: obsdist(dim_obs)
   ! kuw end
@@ -299,8 +304,8 @@ SUBROUTINE init_dim_obs_l_pdaf(domain_p, step, dim_obs_f, dim_obs_l)
         ! Units: Index numbering
         dx = abs(longxy_obs(i) - longxy(domain_p))
         dy = abs(latixy_obs(i) - latixy(domain_p))
-#endif
         dist = sqrt(real(dx)**2 + real(dy)**2)
+#endif
         obsdist(i) = dist
         if (dist <= real(cradius)) then
            dim_obs_l = dim_obs_l + 1
