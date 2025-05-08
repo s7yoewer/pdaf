@@ -36,6 +36,7 @@ PROGRAM pdaf_terrsysmp
   
     USE mod_parallel_pdaf, &
         ONLY : mype_world, MPIerr
+    USE mod_parallel_pdaf, ONLY: abort_parallel
 
     USE mod_tsmp, &
       ONLY: initialize_tsmp, integrate_tsmp, update_tsmp, finalize_tsmp, &
@@ -87,6 +88,14 @@ PROGRAM pdaf_terrsysmp
 
         ! forward simulation of component models
         CALL integrate_tsmp()
+
+        ! barrier before model integration starts
+        CALL MPI_BARRIER(MPI_COMM_WORLD, MPIerr)
+        IF (MPIerr .NE. MPI_SUCCESS) THEN
+            PRINT *, "barrier after first assimilation step failed"
+        END IF
+        WRITE(*, "(a)") "Ending debug run after first assimilation step"
+        CALL abort_parallel()
 
         ! assimilation step
         CALL assimilate_pdaf()

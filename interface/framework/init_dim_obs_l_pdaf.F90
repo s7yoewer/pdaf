@@ -49,7 +49,7 @@ SUBROUTINE init_dim_obs_l_pdaf(domain_p, step, dim_obs_f, dim_obs_l)
   !        ONLY: nx, ny, local_dims, &
   !        cradius, coords_obs, coords_l, obs_index_p, obs_index_l
   USE mod_parallel_pdaf, &
-       ONLY: mype_filter, npes_filter, comm_filter
+       ONLY: mype_world, mype_filter, npes_filter, comm_filter
   USE mod_assimilation, &
        ONLY: cradius, obs_index_l, dim_obs, obs_p, distance, obs_index_p, &
        dim_state, dim_obs_p, &
@@ -288,10 +288,28 @@ SUBROUTINE init_dim_obs_l_pdaf(domain_p, step, dim_obs_f, dim_obs_l)
 #endif
 #endif
 
+     WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "         dim_obs: ", dim_obs
+     WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "        domain_p: ", domain_p
+     WRITE(*, "(a,i5,a,es22.15)") "VD, mype=", mype_world, "         cradius: ", cradius
+
+#ifdef CLMSA
+     WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "  state_pdaf2clm_c_p(domain_p): ", state_pdaf2clm_c_p(domain_p)
+     WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "  mycgridcell(state_pdaf2clm_c_p(domain_p)): ", mycgridcell(state_pdaf2clm_c_p(domain_p))
+     WRITE(*, "(a,i5,a,es22.15)") "VD, mype=", mype_world, "  lon(mycgridcell(state_pdaf2clm_c_p(domain_p))): ", lon(mycgridcell(state_pdaf2clm_c_p(domain_p)))
+     WRITE(*, "(a,i5,a,es22.15)") "VD, mype=", mype_world, "  lat(mycgridcell(state_pdaf2clm_c_p(domain_p))): ", lat(mycgridcell(state_pdaf2clm_c_p(domain_p)))
+#else
+     WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "longxy(domain_p): ", longxy(domain_p)
+     WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "latixy(domain_p): ", latixy(domain_p)
+#endif
+
      do i = 1,dim_obs
 #ifdef CLMSA
         ! Units: lat/lon (degrees)
         ! More doc on following lines: See `localize_covar_pdaf`
+        WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "               i: ", i
+        WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "  obs_pdaf2nc(i): ", obs_pdaf2nc(i)
+        WRITE(*, "(a,i5,a,es22.15)") "VD, mype=", mype_world, "clmobs_lon(obs_pdaf2nc(i)): ", clmobs_lon(obs_pdaf2nc(i))
+        WRITE(*, "(a,i5,a,es22.15)") "VD, mype=", mype_world, "clmobs_lat(obs_pdaf2nc(i)): ", clmobs_lat(obs_pdaf2nc(i))
         dx = abs(clmobs_lon(obs_pdaf2nc(i)) - lon(mycgridcell(state_pdaf2clm_c_p(domain_p))))
         dy = abs(clmobs_lat(obs_pdaf2nc(i)) - lat(mycgridcell(state_pdaf2clm_c_p(domain_p))))
         IF (dx > 180.0) THEN
@@ -299,19 +317,34 @@ SUBROUTINE init_dim_obs_l_pdaf(domain_p, step, dim_obs_f, dim_obs_l)
         END IF
         yhalf = ( clmobs_lat(obs_pdaf2nc(i)) + lat(mycgridcell(state_pdaf2clm_c_p(domain_p))) ) / 2.0
         dx = dx * cos(yhalf * 3.14159265358979323846 / 180.0)
+        WRITE(*, "(a,i5,a,es22.15)") "VD, mype=", mype_world, "            dx: ", dx
+        WRITE(*, "(a,i5,a,es22.15)") "VD, mype=", mype_world, "            dy: ", dy
         dist = 111.19492664455873 * sqrt(real(dx)**2 + real(dy)**2)
 #else
+        WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "               i: ", i
+        WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "   longxy_obs(i): ", longxy_obs(i)
+        WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "   latixy_obs(i): ", latixy_obs(i)
+
         ! Units: Index numbering
         dx = abs(longxy_obs(i) - longxy(domain_p))
         dy = abs(latixy_obs(i) - latixy(domain_p))
+        WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "              dx: ", dx
+        WRITE(*, "(a,i5,a,i10)") "VD, mype=", mype_world, "              dy: ", dy
         dist = sqrt(real(dx)**2 + real(dy)**2)
 #endif
+
+        WRITE(*, "(a,i5,a,es22.15)") "VD, mype=", mype_world, "            dist: ", dist
+
         obsdist(i) = dist
         if (dist <= real(cradius)) then
+           WRITE(*, "(a,i5,a)") "VD, mype=", mype_world, "OBS IN"
            dim_obs_l = dim_obs_l + 1
            obsind(i) = 1
+        else
+           WRITE(*, "(a,i5,a)") "VD, mype=", mype_world, "OBS OUT"
         end if
      end do
+
      end if 
   end if
 #endif
