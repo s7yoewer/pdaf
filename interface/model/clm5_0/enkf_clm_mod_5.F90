@@ -510,8 +510,8 @@ module enkf_clm_mod
     real(r8), pointer :: t_skin(:)
     real(r8), pointer :: tlai(:)
     integer :: i,j,jj,g,c,cc=0,offset=0
-    integer :: lev
     integer :: n_c
+    integer :: lev
     character (len = 34) :: fn    !TSMP-PDAF: function name for state vector output
     character (len = 34) :: fn2    !TSMP-PDAF: function name for swc output
 
