@@ -613,7 +613,9 @@ SUBROUTINE init_dim_obs_pdaf(step, dim_obs_p)
     cnt = 1
     do i = 1, dim_obs
 
-      obs_snapped = .false.
+      ! Many processes may not contain the observation / do not need
+      ! to snap it, so default true
+      obs_snapped = .true.
 
       do g = begg,endg
         newgridcell = .true.
@@ -622,17 +624,6 @@ SUBROUTINE init_dim_obs_pdaf(step, dim_obs_p)
           if(cg .eq. g) then
             if(newgridcell) then
 
-
-#ifdef CLMFIVE
-              if(state_clm2pdaf_p(c,1).eq.ispval) then
-                ! `ispval`: column not in state vector, most likely
-                ! because it is hydrologically inactive
-                !
-                ! Do not use this column for snapping an observation,
-                ! instead cycle to next column
-                cycle
-              end if
-#endif
 
               ! TODO: Check for hydrologically active cells in case
               ! this is wanted. Also warn/error if observations are
@@ -644,10 +635,28 @@ SUBROUTINE init_dim_obs_pdaf(step, dim_obs_p)
               end if
 
               if(((is_use_dr).and.(deltax.le.clmobs_dr(1)).and.(deltay.le.clmobs_dr(2))).or.((.not. is_use_dr).and.(longxy_obs(i) == longxy(g-begg+1)) .and. (latixy_obs(i) == latixy(g-begg+1)))) then
+
+#ifdef CLMFIVE
+                if(state_clm2pdaf_p(c,1).eq.ispval) then
+                  ! `ispval`: column not in state vector, most likely
+                  ! because it is hydrologically inactive
+
+                  ! Observation not snapped, even though location is
+                  ! right!
+                  obs_snapped = .false.
+
+                  ! Do not use this column for snapping an
+                  ! observation, instead cycle to next column
+                  cycle
+                end if
+#endif
+
                 obs_pdaf2nc(local_disp_obs(mype_filter+1)+cnt) = i
                 obs_nc2pdaf(i) = local_disp_obs(mype_filter+1)+cnt
                 cnt = cnt + 1
 
+                ! Observation snapped at location (possibly
+                ! overwriting a false from inactive column before)
                 obs_snapped = .true.
 
               end if
