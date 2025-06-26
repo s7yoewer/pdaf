@@ -117,6 +117,7 @@ SUBROUTINE init_dim_obs_pdaf(step, dim_obs_p)
   use ColumnType, only : col
   ! use GetGlobalValuesMod, only: GetGlobalWrite
   ! use clm_varcon, only: nameg
+  use clm_varcon, only: ispval
   use enkf_clm_mod, only: state_clm2pdaf_p
   use enkf_clm_mod, only: clmstatevec_only_active
   use enkf_clm_mod, only: clmstatevec_max_layer
