@@ -121,6 +121,7 @@ SUBROUTINE init_dim_obs_f_pdaf(step, dim_obs_f)
   use ColumnType, only : col
   ! use GetGlobalValuesMod, only: GetGlobalWrite
   ! use clm_varcon, only: nameg
+  use clm_varcon, only: ispval
   use enkf_clm_mod, only: state_clm2pdaf_p
   use enkf_clm_mod, only: clmstatevec_only_active
   use enkf_clm_mod, only: clmstatevec_max_layer
@@ -618,6 +619,9 @@ SUBROUTINE init_dim_obs_f_pdaf(step, dim_obs_f)
 
     cnt = 1
     do i = 1, dim_obs
+
+      obs_snapped = .false.
+
       do g = begg,endg
         newgridcell = .true.
         do c = begc,endc
@@ -625,6 +629,22 @@ SUBROUTINE init_dim_obs_f_pdaf(step, dim_obs_f)
           if(cg .eq. g) then
             if(newgridcell) then
 
+
+#ifdef CLMFIVE
+              if(state_clm2pdaf_p(c,1).eq.ispval) then
+                ! `ispval`: column not in state vector, most likely
+                ! because it is hydrologically inactive
+                !
+                ! Do not use this column for snapping an observation,
+                ! instead cycle to next column
+                cycle
+              end if
+#endif
+
+              ! TODO: Check for hydrologically active cells in case
+              ! this is wanted. Also warn/error if observations are
+              ! not read by a gridcell with any hydrologically active
+              ! columns
               if(is_use_dr) then
                 deltax = abs(lon(g)-clmobs_lon(i))
                 deltay = abs(lat(g)-clmobs_lat(i))
@@ -634,6 +654,9 @@ SUBROUTINE init_dim_obs_f_pdaf(step, dim_obs_f)
                 obs_pdaf2nc(local_disp_obs(mype_filter+1)+cnt) = i
                 obs_nc2pdaf(i) = local_disp_obs(mype_filter+1)+cnt
                 cnt = cnt + 1
+
+                obs_snapped = .true.
+
               end if
 
               newgridcell = .false.
@@ -642,6 +665,16 @@ SUBROUTINE init_dim_obs_f_pdaf(step, dim_obs_f)
           end if
         end do
       end do
+
+      ! Warning, when an observation has not been snapped to any
+      ! active gridcell.
+      if(.not. obs_snapped) then
+        print *, "TSMP-PDAF mype(w)=", mype_world, ": ERROR observations exist at non-active gridcells."
+        print *, "Consider removing the following observation from the observation files."
+        print *, "Observation-index in NetCDF-file: i=", i
+        call abort_parallel()
+      end if
+
     end do
 
   end if
