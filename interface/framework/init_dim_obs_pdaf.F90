@@ -511,6 +511,7 @@ SUBROUTINE init_dim_obs_pdaf(step, dim_obs_p)
 
                   ! Set observation as counted
                   obs_snapped = .true.
+                  newgridcell = .false.
 
                   cnt = cnt + 1
 
