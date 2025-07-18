@@ -468,42 +468,65 @@ SUBROUTINE init_dim_obs_f_pdaf(step, dim_obs_f)
      allocate(obs_id_p(endg-begg+1))
      obs_id_p(:) = 0
 
+     cnt = 1
+
      do i = 1, dim_obs
-        cnt = 1
         obs_snapped = .false.
         do g = begg, endg
-            if(is_use_dr) then
-                deltax = abs(lon(g)-clmobs_lon(i))
-                deltay = abs(lat(g)-clmobs_lat(i))
-            end if
-            ! Assigning observations to grid cells according to
-            ! snapping distance or index arrays
-            if(((is_use_dr).and.(deltax.le.clmobs_dr(1)).and.(deltay.le.clmobs_dr(2))).or.((.not. is_use_dr).and.(longxy_obs(i) == longxy(cnt)) .and. (latixy_obs(i) == latixy(cnt)))) then
-                dim_obs_p = dim_obs_p + 1
-                obs_id_p(cnt) = i
 
-                ! if (is_use_dr) then
-                !   call GetGlobalWrite(g,nameg)
-                ! end if
+          newgridcell = .true.
 
-                ! Check if observation has already been snapped.
-                ! Comment out if multiple grids per observation are wanted.
-                if (obs_snapped) then
-                  print *, "TSMP-PDAF mype(w)=", mype_world, ": ERROR Observation snapped at multiple grid cells."
-                  print *, "i=", i
-                  if (is_use_dr) then
-                    print *, "clmobs_lon(i)=", clmobs_lon(i)
-                    print *, "clmobs_lat(i)=", clmobs_lat(i)
-                  end if
-                  call abort_parallel()
+          do c = begc,endc
+
+            cg = mycgridcell(c)
+
+            if(cg.eq.g) then
+
+              if(newgridcell) then
+
+                if(is_use_dr) then
+                  deltax = abs(lon(g)-clmobs_lon(i))
+                  deltay = abs(lat(g)-clmobs_lat(i))
                 end if
 
-                ! Set observation as counted
-                obs_snapped = .true.
+                ! Assigning observations to grid cells according to
+                ! snapping distance or index arrays
+                if(((is_use_dr).and.(deltax.le.clmobs_dr(1)).and.(deltay.le.clmobs_dr(2))).or.((.not. is_use_dr).and.(longxy_obs(i) == longxy(cnt)) .and. (latixy_obs(i) == latixy(cnt)))) then
+
+                  dim_obs_p = dim_obs_p + 1
+                  ! Use index array for setting the correct state vector index in `obs_id_p`
+                  obs_id_p(state_clm2pdaf_p(c,clmobs_layer(i))) = i
+
+                  ! if (is_use_dr) then
+                  !   call GetGlobalWrite(g,nameg)
+                  ! end if
+
+                  ! Check if observation has already been snapped.
+                  ! Comment out if multiple grids per observation are wanted.
+                  if (obs_snapped) then
+                    print *, "TSMP-PDAF mype(w)=", mype_world, ": ERROR Observation snapped at multiple grid cells."
+                    print *, "i=", i
+                    if (is_use_dr) then
+                      print *, "clmobs_lon(i)=", clmobs_lon(i)
+                      print *, "clmobs_lat(i)=", clmobs_lat(i)
+                    end if
+                    call abort_parallel()
+                  end if
+
+                  ! Set observation as counted
+                  obs_snapped = .true.
+
+                  cnt = cnt + 1
+
+                end if
+
+              end if
+
             end if
-            cnt = cnt + 1
+
+          end do
         end do
-    end do
+     end do
   end if
 #endif
 #endif
