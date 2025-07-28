@@ -57,16 +57,23 @@ SUBROUTINE obs_op_f_pdaf(step, dim_p, dim_obs_f, state_p, m_state_f)
   !
   ! !USES:
   USE mod_assimilation, &
-       ONLY: obs_index_p, local_dims_obs, local_disp_obs, obs_id_p, obs_nc2pdaf_deprecated, &
+       ONLY: obs_index_p, local_dims_obs, obs_id_p, obs_nc2pdaf_deprecated, &
        var_id_obs, dim_obs_p
-  USE mod_assimilation, ONLY: obs_pdaf2nc
-  USE mod_assimilation, ONLY: obs_nc2pdaf
+  USE mod_assimilation, ONLY: tws_temp_mean_d 
   USE mod_parallel_pdaf, &
-       ONLY: mype_world, mype_filter, npes_filter, comm_filter, MPI_DOUBLE, &
-       MPI_DOUBLE_PRECISION, MPI_INT, MPI_SUM, abort_parallel
+       ONLY: mype_filter, npes_filter, comm_filter, MPI_DOUBLE, &
+       MPI_DOUBLE_PRECISION, MPI_INT, MPI_SUM
   !USE mod_read_obs, & 
   !     ONLY: var_id_obs_nc 
-
+#ifdef CLMSA
+  use decompMod , only : get_proc_bounds
+  use enkf_clm_mod, only: clmupdate_tws, clm_varsize_tws, state_setup, &
+    num_layer, hactiveg_levels, num_hactiveg_patch, hactiveg_patch, remove_mean
+  Use mod_read_obs, only: vec_useObs_global, vec_numPoints_global
+  use clm_varcon, only: spval
+  use clm_varpar   , only : nlevsoi
+  use shr_kind_mod, only: r8 => shr_kind_r8
+#endif
   IMPLICIT NONE
 
   ! !ARGUMENTS:
@@ -85,14 +92,34 @@ SUBROUTINE obs_op_f_pdaf(step, dim_p, dim_obs_f, state_p, m_state_f)
   ! local variables
   INTEGER :: ierror, max_var_id
   INTEGER :: i                         ! Counter
+  INTEGER :: j                         ! Counter
+  INTEGER :: g                         ! Counter
   REAL, ALLOCATABLE :: m_state_tmp(:)  ! Temporary process-local state vector
   INTEGER, ALLOCATABLE :: obs_nc2pdaf_deprecated_p_tmp(:)
   INTEGER, ALLOCATABLE :: obs_nc2pdaf_deprecated_tmp(:)
+
+#ifdef CLMSA
+  REAL:: m_state_sum(size(vec_useObs_global)) ! sum up all model grid cells and variables which correspond to an observation
+  REAL:: m_state_sum_global(size(vec_useObs_global)) ! sum up all model grid cells and variables which correspond to an observation
+
+  integer :: count
+
+  REAL, allocatable :: tws_from_statevector(:)
+
+  integer :: begp, endp   ! per-proc beginning and ending pft indices
+  integer :: begc, endc   ! per-proc beginning and ending column indices
+  integer :: begl, endl   ! per-proc beginning and ending landunit indices
+  integer :: begg, endg   ! per-proc gridcell ending gridcell indices
+  integer :: obs_point    ! which observation is seen by which point?
+#endif
 
   ! *********************************************
   ! *** Perform application of measurement    ***
   ! *** operator H on vector or matrix column ***
   ! *********************************************
+
+
+  if (clmupdate_tws.ne.1) then
 
   ! Check local observation dimension
   if (.not. local_dims_obs(mype_filter+1) == dim_obs_p) then
@@ -169,5 +196,242 @@ SUBROUTINE obs_op_f_pdaf(step, dim_p, dim_obs_f, state_p, m_state_f)
 
   ! Clean up
   DEALLOCATE(m_state_tmp,obs_nc2pdaf_deprecated_p_tmp,obs_nc2pdaf_deprecated_tmp)
+
+  else
+
+#ifdef CLMSA
+    m_state_sum(:) = 0
+
+    call get_proc_bounds(begg, endg, begl, endl, begc, endc, begp, endp)
+
+    if (allocated(tws_from_statevector)) deallocate(tws_from_statevector)
+    allocate(tws_from_statevector(begg:endg))
+
+    tws_from_statevector(begg:endg) = spval
+
+    select case(state_setup)
+    case(0)
+
+      do j = 1,nlevsoi
+
+        do count = 1, num_layer(j)
+
+          g = hactiveg_levels(count,j)
+
+          if (j==1) then
+            tws_from_statevector(g) = 0._r8
+          end if
+
+          if (j==1) then
+
+            ! liq
+            tws_from_statevector(g) = tws_from_statevector(g) + state_p(count)
+
+            ! ice
+            tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1))
+
+          else
+
+            ! liq
+            tws_from_statevector(g) = tws_from_statevector(g) + state_p(count+sum(num_layer(1:j-1)))
+
+            ! ice
+            tws_from_statevector(g) = tws_from_statevector(g) + state_p(count+sum(num_layer(1:j-1)) + clm_varsize_tws(1))
+
+          end if
+
+          if (j == 1) then
+
+            ! snow
+            tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1) + clm_varsize_tws(2))
+
+            ! surface water
+            tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1) + clm_varsize_tws(2)+ clm_varsize_tws(3))
+
+          end if
+
+        end do
+
+      end do
+
+      do count = 1, num_hactiveg_patch
+
+        g = hactiveg_patch(count)
+
+        ! canopy water
+        tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1) + clm_varsize_tws(2)+ clm_varsize_tws(3)+ clm_varsize_tws(4))
+
+      end do
+
+
+    case(1)
+
+      do j = 1,nlevsoi
+
+        do count = 1, num_layer(j)
+
+          g = hactiveg_levels(count,j)
+
+          if (j==1) then
+            tws_from_statevector(g) = 0._r8
+          end if
+
+          if (j==1) then
+
+            ! liq + ice
+            tws_from_statevector(g) = tws_from_statevector(g) + state_p(count)
+
+          else
+
+            ! liq + ice
+            tws_from_statevector(g) = tws_from_statevector(g) + state_p(count+sum(num_layer(1:j-1)))
+
+          end if
+
+          if (j == 1) then
+
+            ! snow
+            tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1) + clm_varsize_tws(2))
+
+            ! surface water
+            tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1) + clm_varsize_tws(2)+ clm_varsize_tws(3))
+
+          end if
+
+        end do
+
+      end do
+
+      do count = 1, num_hactiveg_patch
+
+        g = hactiveg_patch(count)
+
+        ! canopy water
+        tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1) + clm_varsize_tws(2)+ clm_varsize_tws(3)+ clm_varsize_tws(4))
+
+      end do
+
+
+    case(2)
+
+      do count = 1, num_layer(1)
+
+        g = hactiveg_levels(count,1)
+
+        tws_from_statevector(g) = state_p(count)
+
+      end do
+
+    case(3)
+
+      do count = 1,num_layer(1)
+
+        g = hactiveg_levels(count,1)
+
+        tws_from_statevector(g) = state_p(count)
+
+        tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1) + clm_varsize_tws(2))
+
+      end do
+
+    case(4)
+
+      do count = 1,num_layer(1)
+
+        g = hactiveg_levels(count,1)
+
+        tws_from_statevector(g) = state_p(count)
+
+        tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1) + clm_varsize_tws(2))
+
+      end do
+
+      do count = 1,num_layer(8)
+
+        g = hactiveg_levels(count,8)
+
+        tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1))
+
+      end do
+
+    case(5)
+
+      do count = 1,num_layer(1)
+
+        g = hactiveg_levels(count,1)
+
+        tws_from_statevector(g) = state_p(count)
+
+        tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1) + clm_varsize_tws(2) + clm_varsize_tws(3))
+
+      end do
+
+      do count = 1,num_layer(4)
+
+        g = hactiveg_levels(count,4)
+
+        tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1))
+
+      end do
+
+      do count = 1,num_layer(13)
+
+        g = hactiveg_levels(count,13)
+
+        tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1) + clm_varsize_tws(2))
+
+      end do
+
+    end select
+
+
+    do count = 1, num_layer(1)
+
+      g = hactiveg_levels(count,1)
+
+      obs_point = obs_id_p(g)
+
+      if (obs_point /= 0) then
+        ! now, the gridcell that was looked upon has been added to the sum for its corresponging observations to reproduce it. However, GRACE measures anomalies 
+        ! (TWS changes). Due to this reason, a mean per gridcell has to be removed from this sum. The value from the mean corresponds to the mean per gridcell in an
+        ! reference run with unperturbed forcings and surface data.
+        !print*, 'difference TWS and reproduced (', g , ') = ', TWS(g)-tws_from_statevector(g)
+        if (tws_temp_mean_d(g).ne.spval .and. tws_from_statevector(g).ne.spval) then
+
+          if (remove_mean.eq.0) then
+
+            m_state_sum(obs_point) = m_state_sum(obs_point) + tws_from_statevector(g)-tws_temp_mean_d(g)
+
+          else
+
+            m_state_sum(obs_point) = m_state_sum(obs_point) + tws_from_statevector(g)
+
+          end if
+        else if (tws_temp_mean_d(g).eq.spval .and. .not. tws_from_statevector(g).eq.spval) then
+          print*, "error, tws temporal mean is spval and reproduced values is not spval for g = ", g
+          print*, "reproduced = ", tws_from_statevector(g)
+          stop
+        else if (.not. tws_temp_mean_d(g).eq.spval .and. tws_from_statevector(g).eq.spval) then
+          print*, "error, tws temporal mean is not spval and reproduced values is spvalfor g = ", g
+          print*, "temp_mean = ", tws_temp_mean_d(g)
+          stop
+        end if
+
+      end if
+
+    end do
+
+    call mpi_allreduce(m_state_sum, m_state_sum_global, size(vec_useObs_global), mpi_double_precision, mpi_sum, comm_filter, ierror)
+
+    m_state_sum_global = m_state_sum_global/vec_numPoints_global
+
+    m_state_f = pack(m_state_sum_global, vec_useObs_global)
+
+    if (mype_filter==0) then
+      print *, "m_state_global = ", m_state_sum_global
+    end if
+
+#endif
+  end if
 
 END SUBROUTINE obs_op_f_pdaf

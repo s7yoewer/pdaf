@@ -54,6 +54,8 @@ SUBROUTINE init_n_domains_pdaf(step, n_domains_p)
       ONLY: init_n_domains_pfl
 #if defined CLMSA
   USE enkf_clm_mod, ONLY: init_n_domains_clm
+  use enkf_clm_mod, only: num_hactiveg
+  USE enkf_clm_mod, ONLY: clmupdate_tws
 #endif
 
   IMPLICIT NONE
@@ -86,7 +88,11 @@ SUBROUTINE init_n_domains_pdaf(step, n_domains_p)
 #endif
 
 #if defined CLMSA
+  if (clmupdate_tws.eq.1) then
+  n_domains_p = num_hactiveg
+  else
   call init_n_domains_clm(n_domains_p)
+  end if
 #endif
 
 END SUBROUTINE init_n_domains_pdaf

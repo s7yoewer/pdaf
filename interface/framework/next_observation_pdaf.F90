@@ -53,6 +53,8 @@ SUBROUTINE next_observation_pdaf(stepnow, nsteps, doexit, time)
 ! !USES:
   USE mod_assimilation, &
        ONLY: delt_obs, toffset, screen
+  USE mod_assimilation, &
+       ONLY: da_interval_variable
   USE mod_parallel_pdaf, &
        ONLY: mype_world
   USE mod_tsmp, &
@@ -65,6 +67,11 @@ SUBROUTINE next_observation_pdaf(stepnow, nsteps, doexit, time)
   use mod_read_obs, &
        only: check_n_observationfile
   use mod_read_obs, ONLY: check_n_observationfile_da_interval
+  use mod_read_obs, ONLY: check_n_observationfile_set_zero
+  use clm_time_manager, only: get_nstep
+  use enkf_clm_mod, only: da_interval
+  use enkf_clm_mod, only: clmupdate_tws
+  use clm_varcon, only: set_averaging_to_zero, ispval
   IMPLICIT NONE
 
 ! !ARGUMENTS:
@@ -80,6 +87,7 @@ SUBROUTINE next_observation_pdaf(stepnow, nsteps, doexit, time)
   !kuw: local variables
   integer :: counter
   integer :: no_obs=0
+  integer :: nstep
   character (len = 110) :: fn
   !kuw end
 
@@ -87,6 +95,8 @@ SUBROUTINE next_observation_pdaf(stepnow, nsteps, doexit, time)
   
   time = 0.0    ! Not used in fully-parallel implementation variant
   doexit = 0
+
+  if(clmupdate_tws.ne.1) then
 
   !kuw: implementation for at least 1 existing observation per observation file
   !!print *, "stepnow", stepnow
@@ -182,7 +192,45 @@ SUBROUTINE next_observation_pdaf(stepnow, nsteps, doexit, time)
   end if
   !kuw end
 
+  end if
+  
+#ifdef CLMSA
+  if(clmupdate_tws.eq.1) then
+  
+  nstep = get_nstep()
+  nsteps = delt_obs
 
+  if (mype_world==0 .and. screen > 2) then
+      write(*,*) 'TSMP-PDAF (in next_observation_pdaf.F90) total_steps: ',total_steps
+  end if
+  ! Read steps until next observation from current observation file
+  if (stepnow.eq.toffset) then
+    set_averaging_to_zero = 0
+    if (mype_world==0 .and. screen > 2) then
+      write(*,*)'next_observation_pdaf: da_interval from enkfpf.par'
+    end if
+  else
+    write(fn, '(a, i5.5)') trim(obs_filename)//'.', stepnow
+    call check_n_observationfile_da_interval(fn,da_interval_variable)
+    if (da_interval_variable.ne.ispval) then
+      da_interval = da_interval_variable
+    end if
+    call check_n_observationfile_set_zero(fn, set_averaging_to_zero)
+  end if
+  if (mype_world==0 .and. screen > 2) then
+    write(fn, '(a, i5.5)') trim(obs_filename)//'.', stepnow+delt_obs
+    write(*,*)'next_observation_pdaf: fn = ', fn
+    write(*,*)'da_interval (in next_observation_pdaf):',da_interval
+  end if
+  if (set_averaging_to_zero.ne.ispval) then
+    set_averaging_to_zero = set_averaging_to_zero+nstep
+  end if
+  if (mype_world==0 .and. screen > 2) then
+    write(*,*) 'set_averaging_to_zero (in next_observation_pdaf):',set_averaging_to_zero
+  end if
+
+  end if
+#endif
 
 
 !  IF (stepnow + nsteps <= total_steps) THEN

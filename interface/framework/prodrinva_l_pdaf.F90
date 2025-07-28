@@ -53,6 +53,9 @@ SUBROUTINE prodRinvA_l_pdaf(domain_p, step, dim_obs_l, rank, obs_l, A_l, C_l)
   USE mod_assimilation, &
        ONLY: cradius, locweight, sradius, obs_index_p, &
         rms_obs, distance 
+  USE mod_assimilation, &
+    ONLY: obscov, obscov_inv, obs_index_l, dim_obs
+  use mod_read_obs, only: multierr, clm_obserr, clm_obscov, vec_useObs, vec_useObs_global
   USE mod_parallel_pdaf, &
        ONLY: mype_filter
 
@@ -75,6 +78,7 @@ SUBROUTINE prodRinvA_l_pdaf(domain_p, step, dim_obs_l, rank, obs_l, A_l, C_l)
 
 ! *** local variables ***
   INTEGER :: i, j          ! Index of observation component
+  INTEGER :: k
   INTEGER :: verbose       ! Verbosity flag
   INTEGER :: verbose_w     ! Verbosity flag for weight computation
   INTEGER :: ilow, iup     ! Lower and upper bounds of observation domain
@@ -89,6 +93,13 @@ SUBROUTINE prodRinvA_l_pdaf(domain_p, step, dim_obs_l, rank, obs_l, A_l, C_l)
   REAL    :: meanvar                 ! Mean variance in observation domain
   REAL    :: svarpovar               ! Mean state plus observation variance
   REAL    :: var_obs                 ! Variance of observation error
+
+  integer :: countR, countC, ierror
+  REAL :: clm_obserr_model(dim_obs) ! errors of observations in the model domain
+  REAL :: obscov_l(dim_obs_l,dim_obs_l) ! errors of observations in the model domain
+  REAL :: obscov_inv_l(dim_obs_l,dim_obs_l) ! errors of observations in the model domain
+  INTEGER, ALLOCATABLE :: ipiv(:)
+  real, ALLOCATABLE :: work(:)
 
 ! *** NO CHANGES REQUIRED BELOW IF OBSERVATION ERRORS ARE CONSTANT ***
 
@@ -193,11 +204,84 @@ SUBROUTINE prodRinvA_l_pdaf(domain_p, step, dim_obs_l, rank, obs_l, A_l, C_l)
 ! *** Apply weight ***
 ! ********************
 
+  select case (multierr)
+  case(0)
+
   DO j = 1, rank
      DO i = 1, dim_obs_l
          C_l(i, j) =  ivariance_obs * weight(i) * A_l(i, j)
      END DO
   END DO
+   
+  case(1)
+    
+    clm_obserr_model = pack(clm_obserr,vec_useObs_global)
+    DO j = 1, rank
+      DO i = 1, dim_obs_l
+        C_l(i, j) =  1/clm_obserr_model(obs_index_l(i)) * weight(i) * A_l(i, j)
+      END DO
+    END DO
+
+  case(2)
+
+    countR = 1
+    countC = 1
+    do i = 1, dim_obs_l
+      do j = 1,dim_obs_l 
+        !if (i==j) then !test
+        obscov_l(countR,countC) = obscov(obs_index_l(i),obs_index_l(j))
+        !else
+        !   obscov_l(countR,countC) = 0
+        !end if
+        countC = countC+1
+      end do
+      countC=1
+      countR=countR+1
+    end do
+
+    ALLOCATE(ipiv(dim_obs_l))
+    ALLOCATE(work(dim_obs_l))
+    obscov_inv_l = obscov_l
+
+    call dgetrf(dim_obs_l,dim_obs_l,obscov_inv_l,dim_obs_l,ipiv,ierror)
+    call dgetri(dim_obs_l, obscov_inv_l, dim_obs_l, ipiv, work, dim_obs_l, ierror)
+
+
+    if (ierror /= 0) then
+      stop 'prodinva_l_pdaf:  inversion failed!'
+    end if
+
+
+    do j = 1,rank
+      do i = 1,dim_obs_l
+        A_l(i,j) = weight(i)*A_l(i,j)
+      end do
+    end do
+    C_l = matmul(obscov_inv_l,A_l)
+
+    ! DO j = 1, rank
+    !    if (dim_obs_l == 1) then
+    !       C_l(i,j) = obscov_inv_l(1,1)* weight(1) * A_l(1, j)
+    !    else
+    !       do i = 1,dim_obs_l
+    !          C_l(i,j) = 0
+    !          do k = 1,dim_obs_l
+    !             C_l(i,j) = C_l(i,j) + obscov_inv_l(i,k)*A_l(k,j)
+    !          end do
+    !          C_l(i,j) = C_l(i,j)*weight(i)
+    !       end do
+    !    end if
+    ! END DO
+
+    !C_l = matmul(obscov_inv_l,A_l)
+    !   DO j = 1, rank
+    !      DO i = 1, dim_obs_l
+    !          !C_l(i, j) = weight(i) * C_l (i, j)
+    !          C_l(i, j) =  1/obscov(obs_index_l(i),obs_index_l(i)) * weight(i) * A_l(i, j)
+    !      END DO
+    !   END DO
+
+  end select
 
 ! *** Clean up ***
   DEALLOCATE(weight)

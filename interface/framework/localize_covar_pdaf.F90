@@ -34,11 +34,14 @@ SUBROUTINE localize_covar_pdaf(dim_p, dim_obs, HP, HPH)
 
   USE mod_read_obs,&
   ONLY: x_idx_obs_nc, y_idx_obs_nc, z_idx_obs_nc
+  USE mod_read_obs, &
+    ONLY: vec_useObs_global, clmobs_lat, clmobs_lon
 #if defined CLMSA
    USE shr_kind_mod , only : r8 => shr_kind_r8
    USE mod_read_obs, ONLY: clmobs_lon
    USE mod_read_obs, ONLY: clmobs_lat
    USE enkf_clm_mod, ONLY: clmupdate_T
+   USE enkf_clm_mod, ONLY: clmupdate_tws, gridcell_state
    USE enkf_clm_mod, ONLY: clm_begc
    USE enkf_clm_mod, ONLY: clm_endc
    USE enkf_clm_mod, ONLY: state_pdaf2clm_c_p
@@ -82,6 +85,7 @@ SUBROUTINE localize_covar_pdaf(dim_p, dim_obs, HP, HPH)
 
 ! *** local variables ***
   INTEGER :: i, j          ! Index of observation component
+  INTEGER :: gcell
   REAL    :: dx,dy,distance  ! Distance between points in the domain 
   REAL    :: weight        ! Localization weight
   REAL    :: tmp(1,1)= 1.0 ! Temporary, but unused array
@@ -102,6 +106,9 @@ SUBROUTINE localize_covar_pdaf(dim_p, dim_obs, HP, HPH)
 #endif
   INTEGER :: icoord
 
+  REAL, ALLOCATABLE    :: obs_lon(:)
+  REAL, ALLOCATABLE    :: obs_lat(:)
+  
 ! **********************
 ! *** INITIALIZATION ***
 ! **********************
@@ -197,8 +204,6 @@ SUBROUTINE localize_covar_pdaf(dim_p, dim_obs, HP, HPH)
 !by hcp to computer the localized covariance matrix in CLMSA case
 #if defined CLMSA
 
-   IF(model==tag_model_clm)THEN
-
     ! localize HP
     ! ----------- 
 
@@ -214,6 +219,11 @@ SUBROUTINE localize_covar_pdaf(dim_p, dim_obs, HP, HPH)
     lat   => clm3%g%latdeg
     mycgridcell => clm3%g%l%c%gridcell
 #endif
+
+ if(clmupdate_tws.ne.1) then
+    
+    
+   IF(model==tag_model_clm)THEN
 
     DO j = 1, dim_obs
       DO i = 1, dim_p
@@ -308,6 +318,55 @@ SUBROUTINE localize_covar_pdaf(dim_p, dim_obs, HP, HPH)
     if(allocated(clmobs_lat))deallocate(clmobs_lat)
     
   ENDIF ! model==tag_model_clm
+  
+ else
+
+   if (allocated(obs_lon)) deallocate(obs_lon)
+   if (allocated(obs_lat)) deallocate(obs_lat)
+   allocate(obs_lon(dim_obs))
+   allocate(obs_lat(dim_obs))
+   obs_lon = pack(clmobs_lon,vec_useObs_global)
+   obs_lat = pack(clmobs_lat,vec_useObs_global)
+   !if (allocated(clmobs_lon)) deallocate(clmobs_lon)
+   !if (allocated(clmobs_lat)) deallocate(clmobs_lat)
+
+   DO j = 1, dim_obs
+     do i = 1, dim_p
+
+       gcell = gridcell_state(i)
+
+       if (lon(gcell)<180) then
+         dx = abs(obs_lon(j) - lon(gcell))
+       else
+         dx = abs(obs_lon(j) - (lon(gcell)-360))
+       end if
+       dy = abs(obs_lat(j) - lat(gcell))
+       distance = sqrt(real(dx)**2 + real(dy)**2)
+
+       ! Compute weight
+       CALL PDAF_local_weight(wtype, rtype, cradius, sradius, distance, 1, 1, tmp, 1.0, weight, 0)
+
+       ! Apply localization
+       HP(j,i) = weight * HP(j,i)
+
+     END DO
+   END DO
+
+   do j = 1, dim_obs
+     do i = 1, dim_obs
+
+       dx = abs(obs_lon(j) - obs_lon(i))
+       dy = abs(obs_lat(j) - obs_lat(i))
+       distance = sqrt(real(dx)**2 + real(dy)**2)
+
+       CALL PDAF_local_weight(wtype, rtype, cradius, sradius, distance, 1, 1, tmp, 1.0, weight, 0)
+
+       HPH(j,i) = weight * HPH(j,i)
+
+     end do
+   end do
+
+ end if
 #endif
 !hcp end
 

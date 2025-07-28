@@ -47,8 +47,11 @@ SUBROUTINE prodRinvA_pdaf(step, dim_obs_p, rank_dim_ens, obs_p, A_p, C_p)
 ! !USES:
    USE mod_assimilation, &
         ONLY: rms_obs
-
+   USE mod_assimilation, &
+        ONLY: dim_obs, obscov_inv
+  
    use mod_read_obs, only: multierr,clm_obserr, pressure_obserr
+   use mod_read_obs, only: clm_obscov, vec_useObs, vec_useObs_global
 
   IMPLICIT NONE
 
@@ -73,6 +76,10 @@ SUBROUTINE prodRinvA_pdaf(step, dim_obs_p, rank_dim_ens, obs_p, A_p, C_p)
 ! *** local variables ***
   INTEGER :: i, j       ! index of observation component
   REAL :: ivariance_obs ! inverse of variance of the observations
+  REAL :: clm_obserr_model(dim_obs_p) ! errors of observations in the model domain
+  REAL :: obscov_inv_l(dim_obs_p,dim_obs_p) ! local inverse covariance matrix
+  integer :: countR, countC
+  logical :: vec_useObs_p(dim_obs)
 
 ! **********************
 ! *** INITIALIZATION ***
@@ -80,6 +87,8 @@ SUBROUTINE prodRinvA_pdaf(step, dim_obs_p, rank_dim_ens, obs_p, A_p, C_p)
 
   WRITE (*,*) 'TEMPLATE prodrinva_pdaf.F90: Implement multiplication here!'
 
+  SELECT CASE (multierr)
+  CASE (0)
   ! *** initialize numbers
   ivariance_obs = 1.0 / rms_obs ** 2
 
@@ -93,10 +102,61 @@ SUBROUTINE prodRinvA_pdaf(step, dim_obs_p, rank_dim_ens, obs_p, A_p, C_p)
 ! *** computed explicitely.         ***
 ! *************************************
 
+#ifdef PDAF_DEBUG
+  print *, 'prodrinva_pdaf: covariance matrix: case 0'
+#endif
+
   DO j = 1, rank_dim_ens !rank
      DO i = 1, dim_obs_p
         C_p(i, j) = ivariance_obs * A_p(i, j)
      END DO
   END DO
+
+  CASE (1)   ! Diagonal covariance matrix, read from observation file
+    print *, 'prodrinva_pdaf: Observation covariance matrix: case 1'    
+    clm_obserr_model = pack(clm_obserr,vec_useObs)
+    DO j = 1, rank_dim_ens
+      DO i = 1, dim_obs_p
+        C_p(i, j) = 1.0/clm_obserr_model(i) * A_p(i, j)
+      END DO
+    END DO
+
+  CASE (2)	! Fully occupied covariance matrix, read from observation file
+    print *, 'prodrinva_pdaf: Observation covariance matrix: case 2' 
+    ! Find out observations that shoud be considered, obscov_inv contains all used observations
+    j = 1
+    DO i = 1, size(vec_useObs_global,1)
+      if(vec_useObs_global(i).eqv..true.) then
+        if(vec_useObs(i).eqv..true.) then 
+          vec_useObs_p(j) = .true.
+        else
+          vec_useObs_p(j) = .false.
+        end if
+        j = j+1
+      end if
+    END DO
+
+    ! Local covariance matrix
+    countR = 1
+    countC = 1
+    do i = 1, size(obscov_inv,1)
+      if(vec_useObs_p(i)) then
+        do j = 1, size(obscov_inv,2)
+          if(vec_useObs_p(j)) then
+            obscov_inv_l(countR,countC) = obscov_inv(i,j)
+            countC = countC+1;
+          end if
+        end do
+        countC = 1
+        countR = countR+1;
+      end if
+    end do
+
+    C_p = matmul(obscov_inv_l,A_p)
+
+    IF(allocated(obscov_inv))DEALLOCATE(obscov_inv)
+  END SELECT
+  if(allocated(clm_obserr))deallocate(clm_obserr)
+  if(allocated(clm_obscov))deallocate(clm_obscov)
 
 END SUBROUTINE prodRinvA_pdaf
