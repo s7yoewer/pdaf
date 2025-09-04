@@ -59,6 +59,7 @@ module enkf_clm_mod
   real(r8),allocatable :: clm_statevec(:)
   integer,allocatable :: state_pdaf2clm_c_p(:)
   integer,allocatable :: state_pdaf2clm_j_p(:)
+  integer,allocatable :: state_loc2clm_c_p(:)
   ! clm_paramarr: Contains LAI used in obs_op_pdaf for computing model
   ! LST in LST assimilation (clmupdate_T)
   real(r8),allocatable :: clm_paramarr(:)  !hcp CLM parameter vector (f.e. LAI)
@@ -918,6 +919,7 @@ module enkf_clm_mod
 
     implicit none
 
+    INTEGER, INTENT(in) :: domain_p       ! Current local analysis domain
     integer, intent(out) :: dim_l
     integer              :: nshift
 
@@ -951,7 +953,7 @@ module enkf_clm_mod
   subroutine g2l_state_clm(domain_p, dim_p, state_p, dim_l, state_l)
 
     use decompMod, only : get_proc_bounds_atm
-    use ColumnType , only : col
+    ! use ColumnType , only : col
 
     implicit none
 
@@ -967,7 +969,6 @@ module enkf_clm_mod
 
     INTEGER :: i
     INTEGER :: n_domain
-    INTEGER :: nshift_p
 
     ! beg and end gridcell for atm
     call get_proc_bounds_atm(begg, endg)
@@ -990,7 +991,7 @@ module enkf_clm_mod
   subroutine l2g_state_clm(domain_p, dim_l, state_l, dim_p, state_p)
 
     use decompMod, only : get_proc_bounds_atm
-    use ColumnType , only : col
+    ! use ColumnType , only : col
 
     implicit none
 
@@ -1006,7 +1007,6 @@ module enkf_clm_mod
 
     INTEGER :: i
     INTEGER :: n_domain
-    INTEGER :: nshift_p
 
     ! beg and end gridcell for atm
     call get_proc_bounds_atm(begg, endg)
