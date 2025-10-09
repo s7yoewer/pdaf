@@ -87,6 +87,7 @@ void read_enkfpar(char *parname)
   clmt_printensemble    = iniparser_getint(pardict,"CLM:t_printensemble",-1);
   clmwatmin_switch      = iniparser_getint(pardict,"CLM:watmin_switch",0);
   clmupdate_tws         = iniparser_getint(pardict,"CLM:update_tws",1);
+  clmswc_mask_snow      = iniparser_getint(pardict,"CLM:swc_mask_snow",0);
 
   /* get settings for COSMO */
   nproccosmo      = iniparser_getint(pardict,"COSMO:nprocs",0);
@@ -154,7 +155,7 @@ void read_enkfpar(char *parname)
   }
 
   /* Check: `da_interval` must be 1 if `flexible_da_interval` is switched on.  */
-  /*        This way `PF:simtime` is direct input of `total_steps`
+  /*        This way `PF:simtime` is direct input of `total_steps` */
   /*        and `PF:starttime` is direct input of `tstartcycle`.  */
   if (flexible_da_interval == 1 && da_interval != 1){
     printf("flexible_da_interval=%d\n", flexible_da_interval);

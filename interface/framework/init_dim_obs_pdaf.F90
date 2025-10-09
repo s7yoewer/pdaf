@@ -511,6 +511,9 @@ pp       ! dim_obs_p, &
 
                 if(is_use_dr) then
                   deltax = abs(lon(g)-clmobs_lon(i))
+                  if (deltax > 180.0) then
+                    deltax = 360.0 - deltax
+                  end if
                   deltay = abs(lat(g)-clmobs_lat(i))
                 end if
 
@@ -686,6 +689,9 @@ pp       ! dim_obs_p, &
               ! columns
               if(is_use_dr) then
                 deltax = abs(lon(g)-clmobs_lon(i))
+                if (deltax > 180.0) then
+                  deltax = 360.0 - deltax
+                end if
                 deltay = abs(lat(g)-clmobs_lat(i))
               end if
 
@@ -1026,6 +1032,9 @@ pp       ! dim_obs_p, &
 
                if(is_use_dr) then
                  deltax = abs(lon(g)-clmobs_lon(i))
+                 if (deltax > 180.0) then
+                   deltax = 360.0 - deltax
+                 end if
                  deltay = abs(lat(g)-clmobs_lat(i))
                end if
 

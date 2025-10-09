@@ -58,6 +58,9 @@ SUBROUTINE prodRinvA_l_pdaf(domain_p, step, dim_obs_l, rank, obs_l, A_l, C_l)
   use mod_read_obs, only: multierr, clm_obserr, clm_obscov, vec_useObs, vec_useObs_global
   USE mod_parallel_pdaf, &
        ONLY: mype_filter
+  USE mod_read_obs, ONLY: multierr
+  USE mod_read_obs, ONLY: clm_obserr
+  USE mod_read_obs, ONLY: pressure_obserr
 
   IMPLICIT NONE
 
@@ -203,6 +206,8 @@ SUBROUTINE prodRinvA_l_pdaf(domain_p, step, dim_obs_l, rank, obs_l, A_l, C_l)
 ! ********************
 ! *** Apply weight ***
 ! ********************
+ SELECT CASE (multierr)
+ CASE(0)
 
   select case (multierr)
   case(0)
@@ -282,6 +287,22 @@ SUBROUTINE prodRinvA_l_pdaf(domain_p, step, dim_obs_l, rank, obs_l, A_l, C_l)
     !   END DO
 
   end select
+
+ CASE(1)
+
+   DO j = 1, rank
+     DO i = 1, dim_obs_l
+#if defined CLMSA
+       ! OBS_INDEX_L: returns NC-ordered index
+       ! CLM_OBSERR: NC-ordered array
+       C_l(i, j) =  1.0/(clm_obserr(obs_index_l(i))*clm_obserr(obs_index_l(i))) * weight(i) * A_l(i, j)
+#else
+       C_l(i, j) =  1.0/(pressure_obserr(obs_index_l(i))*pressure_obserr(obs_index_l(i))) * weight(i) * A_l(i, j)
+#endif
+     END DO
+   END DO
+
+ END SELECT
 
 ! *** Clean up ***
   DEALLOCATE(weight)
