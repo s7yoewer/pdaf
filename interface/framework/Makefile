@@ -64,7 +64,7 @@ LIBS += -L$(MODELDIR) $(TSMPPDAFLIBS)
 # Rules et al.
 ######################################################
 
-.SUFFIXES: .c .F90 .o 
+.SUFFIXES: .c .F90 .o
 
 # Modules used for the model part
 MODULES =  	mod_tsmp.o
@@ -76,8 +76,12 @@ MOD_ASSIM = 	mod_parallel_pdaf.o \
 		mod_read_obs.o
 
 # Model routines used with PDAF
-OBJ_MODEL_PDAF =pdaf_terrsysmp.o\
-		integrate_pdaf.o
+OBJ_MODEL_PDAF =pdaf_terrsysmp.o
+
+# Routines of observation handling (PDAF-OMI)
+OBJ_USER_PDAFOMI = obs_GRACE_pdafomi.o \
+		obs_SM_pdafomi.o \
+		callback_obs_pdafomi.o
 
 # Interface to PDAF - model sided
 OBJ_PDAF_INT =  init_parallel_pdaf.o \
@@ -92,36 +96,16 @@ OBJ_USER_GEN  = init_ens.o \
 		prepoststep_ens_pdaf.o \
 		next_observation_pdaf.o \
 		distribute_state_pdaf.o \
-		collect_state_pdaf.o \
-		init_obs_pdaf.o \
-		init_dim_obs_pdaf.o \
-		obs_op_pdaf.o
-
-# User-supplied routines for ESTKF/SEIK/ETKF
-OBJ_USER_SEIK = prodrinva_pdaf.o \
-		init_obsvar_pdaf.o
-
-# User-supplied routines for EnKF
-OBJ_USER_ENKF = add_obs_error_pdaf.o \
-		init_obscovar_pdaf.o 
+		collect_state_pdaf.o
 
 # User-supplied routines for localized analysis (LESTKF/LSEIK/LETKF)
 OBJ_USER_LOCAL = init_n_domains_pdaf.o \
 		init_dim_l_pdaf.o \
 		g2l_state_pdaf.o \
-		l2g_state_pdaf.o \
-		prodrinva_l_pdaf.o \
-		init_obs_l_pdaf.o \
-		init_dim_obs_l_pdaf.o \
-		g2l_obs_pdaf.o \
-		init_obsvar_l_pdaf.o \
-		init_dim_obs_f_pdaf.o \
-		init_obs_f_pdaf.o \
-		obs_op_f_pdaf.o \
-		localize_covar_pdaf.o
+		l2g_state_pdaf.o
 
 # Full list of user-supplied routines for online modes
-OBJ_PDAF_USER = $(OBJ_USER_GEN) $(OBJ_USER_SEIK) $(OBJ_USER_ENKF) $(OBJ_USER_LOCAL)
+OBJ_PDAF_USER = $(OBJ_USER_PDAFOMI) $(OBJ_PDAF_INT) $(OBJ_USER_GEN) $(OBJ_USER_LOCAL)
 
 ######################################################
 
@@ -143,14 +127,14 @@ info:
 
 
 $(PROG) : $(LIBMODEL) libpdaf-d.a \
-	$(MODULES) $(MOD_ASSIM) $(OBJ_MODEL_PDAF) $(OBJ_PDAF_INT) $(OBJ_PDAF_USER) 
+	$(MODULES) $(MOD_ASSIM) $(OBJ_MODEL_PDAF) $(OBJ_PDAF_USER)
 	$(PREP_C) $(LD)  $(OPT_LNK)  -o $@ \
-	$(MODULES) $(MOD_ASSIM) $(OBJ_MODEL_PDAF) $(OBJ_PDAF_INT) $(OBJ_PDAF_USER) \
+	$(MODULES) $(MOD_ASSIM) $(OBJ_MODEL_PDAF) $(OBJ_PDAF_USER) \
 	-L$(BASEDIR)/lib -lpdaf-d $(LIBMODEL) $(LIBS) $(LINK_LIBS)
 
 ######################################################
 
-libpdaf-d.a: 
+libpdaf-d.a:
 	@echo "++++++ Generate Filter library +++++++"
 
 #	@cd $(BASEDIR)/src; make;
@@ -173,4 +157,4 @@ cleanpdaf:
 	cd $(BASEDIR)/src; make clean
 
 depend .depend:
-	mpif90 -M *.F90 > .depend 
+	mpif90 -M *.F90 > .depend

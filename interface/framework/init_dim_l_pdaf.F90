@@ -31,43 +31,43 @@
 ! !INTERFACE:
 SUBROUTINE init_dim_l_pdaf(step, domain_p, dim_l)
 
-! !DESCRIPTION:
-! User-supplied routine for PDAF.
-! Used in the filters: LSEIK/LETKF/LESTKF
-!
-! The routine is called during analysis step
-! in the loop over all local analysis domain.
-! It has to set the dimension of local model
-! state on the current analysis domain.
-!
-! !REVISION HISTORY:
-! 2013-02 - Lars Nerger - Initial code
-! Later revisions - see svn log
-!
-! !USES:
-  USE mod_tsmp, ONLY: tag_model_parflow, &
-       tag_model_clm, model
-  USE mod_tsmp, &
-       ONLY: init_dim_l_pfl
+    ! !DESCRIPTION:
+  ! User-supplied routine for PDAF.
+  ! Used in the filters: LSEIK/LETKF/LESTKF
+  !
+  ! The routine is called during analysis step
+  ! in the loop over all local analysis domain.
+  ! It has to set the dimension of local model 
+  ! state on the current analysis domain.
+  !
+  ! !REVISION HISTORY:
+  ! 2013-02 - Lars Nerger - Initial code
+  ! Later revisions - see svn log
+  !
+  ! !USES:
+    USE mod_tsmp, ONLY: tag_model_parflow, &
+         tag_model_clm, model
+    USE mod_tsmp, &
+         ONLY: init_dim_l_pfl
 #ifdef CLMSA
-  USE enkf_clm_mod, ONLY: init_dim_l_clm
+    USE enkf_clm_mod, ONLY: init_dim_l_clm
 #endif
-  IMPLICIT NONE
-
-! !ARGUMENTS:
-  INTEGER, INTENT(in)  :: step     ! Current time step
-  INTEGER, INTENT(in)  :: domain_p ! Current local analysis domain
-  INTEGER, INTENT(out) :: dim_l    ! Local state dimension
-
-! !CALLING SEQUENCE:
-! Called by: PDAF_lseik_update   (as U_init_dim_l)
-! Called by: PDAF_lestkf_update  (as U_init_dim_l)
-! Called by: PDAF_letkf_update   (as U_init_dim_l)
-!EOP
-
-! ****************************************
-! *** Initialize local state dimension ***
-! ****************************************
+    IMPLICIT NONE
+  
+  ! !ARGUMENTS:
+    INTEGER, INTENT(in)  :: step     ! Current time step
+    INTEGER, INTENT(in)  :: domain_p ! Current local analysis domain
+    INTEGER, INTENT(out) :: dim_l    ! Local state dimension
+  
+  ! !CALLING SEQUENCE:
+  ! Called by: PDAF_lseik_update   (as U_init_dim_l)
+  ! Called by: PDAF_lestkf_update  (as U_init_dim_l)
+  ! Called by: PDAF_letkf_update   (as U_init_dim_l)
+  !EOP
+  
+  ! ****************************************
+  ! *** Initialize local state dimension ***
+  ! ****************************************
 #if defined PARFLOW_STAND_ALONE
   ! Set the size of the local analysis domain
   call init_dim_l_pfl(dim_l)
@@ -75,20 +75,20 @@ SUBROUTINE init_dim_l_pdaf(step, domain_p, dim_l)
 
 #if defined COUP_OAS_PFL
   if (model == tag_model_parflow) then
-     ! Set the size of the local analysis domain
+     ! Set the size of the local analysis domain 
      call init_dim_l_pfl(dim_l)
   end if
   if (model == tag_model_clm) then
-     ! Set the size of the local analysis domain
-     dim_l = 1
-  end if
+     ! Set the size of the local analysis domain   
+     dim_l = 1     
+  end if   
 #endif
 
 #if defined CLMSA
-  ! Set the size of the local analysis domain
+  ! Set the size of the local analysis domain  
   ! for clm stand alone mode only
 
   call init_dim_l_clm(domain_p, dim_l)
 #endif
-
+   
 END SUBROUTINE init_dim_l_pdaf

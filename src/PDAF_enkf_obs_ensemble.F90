@@ -238,6 +238,8 @@ SUBROUTINE PDAF_enkf_obs_ensemble(step, dim_obs_p, dim_obs, dim_ens, m_ens_p, &
 
         ALLOCATE(randvals(dim_obs))
 
+        write(*,*) 'size of map_obs_id: ', size(map_obs_id)
+
         ! generate random states for local domain
         membersB: DO member = 1, dim_ens
 

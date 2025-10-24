@@ -32,8 +32,8 @@
 SUBROUTINE assimilate_pdaf()
 
 ! !DESCRIPTION:
-! This routine is called during the model integrations at each time
-! step. It check whether the forecast phase is completed. If so,
+! This routine is called during the model integrations at each time 
+! step. It check whether the forecast phase is completed. If so, 
 ! PDAF_put_state_X is called to perform the analysis step.
 !
 ! !REVISION HISTORY:
@@ -45,7 +45,9 @@ SUBROUTINE assimilate_pdaf()
        ONLY: abort_parallel, mype_world
   USE mod_assimilation, &      ! Variables for assimilation
        ONLY: filtertype
-  ! USE PDAF_interfaces_module   ! Check consistency of PDAF calls
+  USE PDAF_interfaces_module, &   ! Check consistency of PDAF calls
+      ONLY: PDAFomi_assimilate_local, PDAFomi_assimilate_global, &
+      PDAFomi_assimilate_lenkf, PDAF_get_localfilter
 
   IMPLICIT NONE
 
@@ -57,43 +59,44 @@ SUBROUTINE assimilate_pdaf()
 
 ! Local variables
   INTEGER :: status_pdaf       ! PDAF status flag
+  INTEGER :: localfilter          ! Flag for domain-localized filter (1=true)
 
 
 ! ! External subroutines
-! !  (subroutine names are passed over to PDAF in the calls to
-! !  PDAF_get_state and PDAF_assimilate_X. This allows the user
-! !  to specify the actual name of a routine. However, the
+! !  (subroutine names are passed over to PDAF in the calls to 
+! !  PDAF_get_state and PDAF_assimilate_X. This allows the user 
+! !  to specify the actual name of a routine. However, the 
 ! !  PDAF-internal name of a subroutine might be different from
 ! !  the external name!)
 !
 ! ! Subroutines used with all filters
-  EXTERNAL :: collect_state_pdaf, &    ! Routine to collect a state vector from model fields
-       init_dim_obs_pdaf, &            ! Initialize dimension of observation vector
-       obs_op_pdaf, &                  ! Implementation of the Observation operator
-       init_obs_pdaf, &                ! Routine to provide vector of measurements
-       prepoststep_ens_pdaf, &         ! User supplied pre/poststep routine
-       prodRinvA_pdaf, &               ! Provide product R^-1 A for some matrix A
-       init_obsvar_pdaf, &             ! Initialize mean observation error variance
-       next_observation_pdaf, &        ! Provide time step, model time, and dimension of next observation
-       distribute_state_pdaf           ! Routine to distribute a state vector to model fields
-! ! Subroutines for local filters
-  EXTERNAL :: init_n_domains_pdaf, &   ! Provide number of local analysis domains
-       init_dim_l_pdaf, &              ! Initialize state dimension for local ana. domain
-       init_dim_obs_l_pdaf,&           ! Initialize dim. of obs. vector for local ana. domain
-       g2l_state_pdaf, &               ! Get state on local ana. domain from global state
-       l2g_state_pdaf, &               ! Init global state from state on local analysis domain
-       g2l_obs_pdaf, &                 ! Restrict a global obs. vector to local analysis domain
-       init_obs_l_pdaf, &              ! Provide vector of measurements for local ana. domain
-       prodRinvA_l_pdaf, &             ! Provide product R^-1 A for some local matrix A
-       init_obsvar_l_pdaf, &           ! Initialize local mean observation error variance
-       init_obs_f_pdaf, &              ! Provide full vector of measurements for PE-local domain
-       obs_op_f_pdaf, &                ! Obs. operator for full obs. vector for PE-local domain
-       init_dim_obs_f_pdaf             ! Get dimension of full obs. vector for PE-local domain
-! ! Subroutines used in EnKF
-  EXTERNAL :: add_obs_error_pdaf, &    ! Add obs. error covariance R to HPH in EnKF
-       init_obscovar_pdaf              ! Initialize obs error covar R in EnKF
-! ! Subroutines used for localization in LEnKF
-  EXTERNAL :: localize_covar_pdaf       ! Apply localization to HP and HPH^T
+!   EXTERNAL :: collect_state_pdaf, &    ! Routine to collect a state vector from model fields
+!        init_dim_obs_pdaf, &            ! Initialize dimension of observation vector
+!        obs_op_pdaf, &                  ! Implementation of the Observation operator
+!        init_obs_pdaf, &                ! Routine to provide vector of measurements
+!        prepoststep_ens_pdaf, &         ! User supplied pre/poststep routine
+!        prodRinvA_pdaf, &               ! Provide product R^-1 A for some matrix A
+!        init_obsvar_pdaf, &             ! Initialize mean observation error variance
+!        next_observation_pdaf, &        ! Provide time step, model time, and dimension of next observation
+!        distribute_state_pdaf           ! Routine to distribute a state vector to model fields
+! ! ! Subroutines for local filters
+!   EXTERNAL :: init_n_domains_pdaf, &   ! Provide number of local analysis domains
+!        init_dim_l_pdaf, &              ! Initialize state dimension for local ana. domain
+!        init_dim_obs_l_pdaf,&           ! Initialize dim. of obs. vector for local ana. domain
+!        g2l_state_pdaf, &               ! Get state on local ana. domain from global state
+!        l2g_state_pdaf, &               ! Init global state from state on local analysis domain
+!        g2l_obs_pdaf, &                 ! Restrict a global obs. vector to local analysis domain
+!        init_obs_l_pdaf, &              ! Provide vector of measurements for local ana. domain
+!        prodRinvA_l_pdaf, &             ! Provide product R^-1 A for some local matrix A
+!        init_obsvar_l_pdaf, &           ! Initialize local mean observation error variance
+!        init_obs_f_pdaf, &              ! Provide full vector of measurements for PE-local domain
+!        obs_op_f_pdaf, &                ! Obs. operator for full obs. vector for PE-local domain
+!        init_dim_obs_f_pdaf             ! Get dimension of full obs. vector for PE-local domain
+! ! ! Subroutines used in EnKF
+!   EXTERNAL :: add_obs_error_pdaf, &    ! Add obs. error covariance R to HPH in EnKF
+!        init_obscovar_pdaf              ! Initialize obs error covar R in EnKF
+! ! ! Subroutines used for localization in LEnKF
+!   EXTERNAL :: localize_covar_pdaf       ! Apply localization to HP and HPH^T
 ! ! ! Subroutines used in NETF
 !   EXTERNAL :: likelihood_pdaf          ! Compute observation likelihood for an ensemble member
 ! ! ! Subroutines used in LNETF
@@ -101,6 +104,27 @@ SUBROUTINE assimilate_pdaf()
 ! ! ! Subroutines used in LKNETF
 !   EXTERNAL :: likelihood_hyb_l_pdaf, & ! Compute local likelihood awith hybrid weight for an ensemble member
 !        prodRinvA_hyb_l_pdaf            ! Provide product R^-1 A for some matrix A including hybrid weight
+
+  ! Interface between model and PDAF, and prepoststep
+  EXTERNAL :: collect_state_pdaf, &      ! Collect a state vector from model fields
+    distribute_state_pdaf, &       ! Distribute a state vector to model fields
+    next_observation_pdaf, &       ! Provide time step of next observation
+    prepoststep_ens_pdaf               ! User supplied pre/poststep routine
+
+  ! Localization of state vector
+  EXTERNAL :: init_n_domains_pdaf, &  ! Provide number of local analysis domains
+    init_dim_l_pdaf, &             ! Initialize state dimension for local analysis domain
+    g2l_state_pdaf, &              ! Get state on local analysis domain from global state
+    l2g_state_pdaf                 ! Update global state from state on local analysis domain
+
+  ! Interface to PDAF-OMI for local and global filters
+  EXTERNAL :: init_dim_obs_pdafomi, & ! Get dimension of full obs. vector for PE-local domain
+    obs_op_pdafomi, &              ! Obs. operator for full obs. vector for PE-local domain
+    init_dim_obs_l_pdafomi, &      ! Get dimension of obs. vector for local analysis domain
+    localize_covar_pdafomi         ! Apply localization to covariance matrix in LEnKF
+
+  
+
 
 ! *** Switch on debug output ***
 ! *** for main process        ***
@@ -112,49 +136,76 @@ SUBROUTINE assimilate_pdaf()
 ! *** Call assimilation routine ***
 ! *********************************
 
+CALL PDAF_get_localfilter(localfilter)
+
+IF (localfilter == 1) THEN
+
+  CALL PDAFomi_assimilate_local(collect_state_pdaf, distribute_state_pdaf, &
+          init_dim_obs_pdafomi, obs_op_pdafomi, prepoststep_ens_pdaf, init_n_domains_pdaf, &
+          init_dim_l_pdaf, init_dim_obs_l_pdafomi, g2l_state_pdaf, l2g_state_pdaf, &
+          next_observation_pdaf, status_pdaf)
+
+ELSE
+
+  IF (filtertype == 8) THEN
+    ! LEnKF has its own OMI interface routine
+    CALL PDAFomi_assimilate_lenkf(collect_state_pdaf, distribute_state_pdaf, &
+    init_dim_obs_pdafomi, obs_op_pdafomi, prepoststep_ens_pdaf, &
+    localize_covar_pdafomi, next_observation_pdaf, status_pdaf)
+
+  ELSE
+
+    CALL PDAFomi_assimilate_global(collect_state_pdaf, distribute_state_pdaf, &
+             init_dim_obs_pdafomi, obs_op_pdafomi, prepoststep_ens_pdaf, &
+             next_observation_pdaf, status_pdaf)
+
+  ENDIF
+
+ENDIF
+
   ! IF (filtertype == 1) THEN
   !    CALL PDAF_assimilate_seik(collect_state_pdaf, distribute_state_pdaf, &
   !         init_dim_obs_pdaf, obs_op_pdaf, init_obs_pdaf, prepoststep_ens_pdaf, &
   !         prodRinvA_pdaf, next_observation_pdaf, status_pdaf)
-  IF (filtertype == 2) THEN
-    CALL PDAF_assimilate_enkf(collect_state_pdaf, distribute_state_pdaf, &
-      init_dim_obs_pdaf, obs_op_pdaf, &
-      init_obs_pdaf, prepoststep_ens_pdaf, add_obs_error_pdaf, init_obscovar_pdaf, &
-      next_observation_pdaf, status_pdaf)
-  ! ELSE IF (filtertype == 3) THEN
-  !    CALL PDAF_assimilate_lseik(collect_state_pdaf, distribute_state_pdaf, &
+  ! IF (filtertype == 2) THEN
+  !   CALL PDAF_assimilate_enkf(collect_state_pdaf, distribute_state_pdaf, &
+  !     init_dim_obs_pdaf, obs_op_pdaf, &
+  !     init_obs_pdaf, prepoststep_ens_pdaf, add_obs_error_pdaf, init_obscovar_pdaf, &
+  !     next_observation_pdaf, status_pdaf)
+  ! ! ELSE IF (filtertype == 3) THEN
+  ! !    CALL PDAF_assimilate_lseik(collect_state_pdaf, distribute_state_pdaf, &
+  ! !         init_dim_obs_f_pdaf, obs_op_f_pdaf, &
+  ! !         init_obs_f_pdaf, init_obs_l_pdaf, prepoststep_ens_pdaf, &
+  ! !         prodRinvA_l_pdaf, init_n_domains_pdaf, init_dim_l_pdaf, &
+  ! !         init_dim_obs_l_pdaf, g2l_state_pdaf, l2g_state_pdaf, &
+  ! !         g2l_obs_pdaf, init_obsvar_pdaf, init_obsvar_l_pdaf, next_observation_pdaf, status_pdaf)
+  ! ELSE IF (filtertype == 4) THEN
+  !    CALL PDAF_assimilate_etkf(collect_state_pdaf, distribute_state_pdaf, &
+  !         init_dim_obs_pdaf, obs_op_pdaf, &
+  !         init_obs_pdaf, prepoststep_ens_pdaf, prodRinvA_pdaf, init_obsvar_pdaf, next_observation_pdaf, status_pdaf)
+  ! ELSE IF (filtertype == 5) THEN
+  !    CALL PDAF_assimilate_letkf(collect_state_pdaf, distribute_state_pdaf, &
   !         init_dim_obs_f_pdaf, obs_op_f_pdaf, &
   !         init_obs_f_pdaf, init_obs_l_pdaf, prepoststep_ens_pdaf, &
   !         prodRinvA_l_pdaf, init_n_domains_pdaf, init_dim_l_pdaf, &
   !         init_dim_obs_l_pdaf, g2l_state_pdaf, l2g_state_pdaf, &
   !         g2l_obs_pdaf, init_obsvar_pdaf, init_obsvar_l_pdaf, next_observation_pdaf, status_pdaf)
-  ELSE IF (filtertype == 4) THEN
-     CALL PDAF_assimilate_etkf(collect_state_pdaf, distribute_state_pdaf, &
-          init_dim_obs_pdaf, obs_op_pdaf, &
-          init_obs_pdaf, prepoststep_ens_pdaf, prodRinvA_pdaf, init_obsvar_pdaf, next_observation_pdaf, status_pdaf)
-  ELSE IF (filtertype == 5) THEN
-     CALL PDAF_assimilate_letkf(collect_state_pdaf, distribute_state_pdaf, &
-          init_dim_obs_f_pdaf, obs_op_f_pdaf, &
-          init_obs_f_pdaf, init_obs_l_pdaf, prepoststep_ens_pdaf, &
-          prodRinvA_l_pdaf, init_n_domains_pdaf, init_dim_l_pdaf, &
-          init_dim_obs_l_pdaf, g2l_state_pdaf, l2g_state_pdaf, &
-          g2l_obs_pdaf, init_obsvar_pdaf, init_obsvar_l_pdaf, next_observation_pdaf, status_pdaf)
-  ELSE IF (filtertype == 6) THEN
-     CALL PDAF_assimilate_estkf(collect_state_pdaf, distribute_state_pdaf, &
-          init_dim_obs_pdaf, obs_op_pdaf, &
-          init_obs_pdaf, prepoststep_ens_pdaf, prodRinvA_pdaf, init_obsvar_pdaf, next_observation_pdaf, status_pdaf)
-  ELSE IF (filtertype == 7) THEN
-     CALL PDAF_assimilate_lestkf(collect_state_pdaf, distribute_state_pdaf, &
-          init_dim_obs_f_pdaf, obs_op_f_pdaf, &
-          init_obs_f_pdaf, init_obs_l_pdaf, prepoststep_ens_pdaf, &
-          prodRinvA_l_pdaf, init_n_domains_pdaf, init_dim_l_pdaf, &
-          init_dim_obs_l_pdaf, g2l_state_pdaf, l2g_state_pdaf, &
-          g2l_obs_pdaf, init_obsvar_pdaf, init_obsvar_l_pdaf, next_observation_pdaf, status_pdaf)
-  ELSE IF (filtertype == 8) THEN
-     CALL PDAF_assimilate_lenkf(collect_state_pdaf, distribute_state_pdaf, &
-          init_dim_obs_pdaf, obs_op_pdaf, &
-          init_obs_pdaf, prepoststep_ens_pdaf, localize_covar_pdaf, add_obs_error_pdaf, &
-          init_obscovar_pdaf, next_observation_pdaf, status_pdaf)
+  ! ELSE IF (filtertype == 6) THEN
+  !    CALL PDAF_assimilate_estkf(collect_state_pdaf, distribute_state_pdaf, &
+  !         init_dim_obs_pdaf, obs_op_pdaf, &
+  !         init_obs_pdaf, prepoststep_ens_pdaf, prodRinvA_pdaf, init_obsvar_pdaf, next_observation_pdaf, status_pdaf)
+  ! ELSE IF (filtertype == 7) THEN
+  !    CALL PDAF_assimilate_lestkf(collect_state_pdaf, distribute_state_pdaf, &
+  !         init_dim_obs_f_pdaf, obs_op_f_pdaf, &
+  !         init_obs_f_pdaf, init_obs_l_pdaf, prepoststep_ens_pdaf, &
+  !         prodRinvA_l_pdaf, init_n_domains_pdaf, init_dim_l_pdaf, &
+  !         init_dim_obs_l_pdaf, g2l_state_pdaf, l2g_state_pdaf, &
+  !         g2l_obs_pdaf, init_obsvar_pdaf, init_obsvar_l_pdaf, next_observation_pdaf, status_pdaf)
+  ! ELSE IF (filtertype == 8) THEN
+  !    CALL PDAF_assimilate_lenkf(collect_state_pdaf, distribute_state_pdaf, &
+  !         init_dim_obs_pdaf, obs_op_pdaf, &
+  !         init_obs_pdaf, prepoststep_ens_pdaf, localize_covar_pdaf, add_obs_error_pdaf, &
+  !         init_obscovar_pdaf, next_observation_pdaf, status_pdaf)
   ! ELSE IF (filtertype == 9) THEN
   !    CALL PDAF_assimilate_netf(collect_state_pdaf, distribute_state_pdaf, &
   !         init_dim_obs_pdaf, &
@@ -180,7 +231,7 @@ SUBROUTINE assimilate_pdaf()
   !         init_dim_obs_pdaf, &
   !         obs_op_pdaf, init_obs_pdaf, prepoststep_ens_pdaf, &
   !         likelihood_pdaf, next_observation_pdaf, status_pdaf)
-  END IF
+  ! END IF
 
   ! Check for errors during execution of PDAF
 
@@ -195,5 +246,7 @@ SUBROUTINE assimilate_pdaf()
 #ifdef PDAF_DEBUG
   CALL PDAF_set_debug_flag(0)
 #endif
+
+  
 
 END SUBROUTINE assimilate_pdaf

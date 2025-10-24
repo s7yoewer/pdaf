@@ -23,11 +23,7 @@
 !-------------------------------------------------------------------------------------------
 
 module mod_tsmp
-    use iso_c_binding, only: c_int, c_ptr, c_double
-
-    implicit none
-
-    public
+    use iso_c_binding
 
     integer(c_int) , bind(c) :: enkf_subvecsize, pf_statevecsize, nprocpf, nprocclm, nproccosmo
     integer(c_int) , bind(c) :: flexible_da_interval
@@ -68,49 +64,48 @@ module mod_tsmp
 
     interface
         subroutine initialize_tsmp() bind(c)
-            ! use iso_c_binding
+            use iso_c_binding
             implicit none
         end subroutine initialize_tsmp
     end interface
 
     interface
         subroutine finalize_tsmp() bind(c)
-            ! use iso_c_binding
+            use iso_c_binding
             implicit none
         end subroutine finalize_tsmp
     end interface
 
     interface
         subroutine integrate_tsmp() bind(c)
-            ! use iso_c_binding
+            use iso_c_binding
             implicit none
         end subroutine integrate_tsmp
     end interface
 
     interface
         subroutine update_tsmp() bind(c)
-            ! use iso_c_binding
+            use iso_c_binding
             implicit none
         end subroutine update_tsmp
     end interface
 
-     interface
+    interface
         subroutine init_n_domains_pfl(n_domains_p) bind(c)
-            use iso_c_binding, only: c_int
+            use iso_c_binding
             import
-            implicit none
-            INTEGER(c_int), INTENT(out) :: n_domains_p ! PE-local number of analysis domains
+            INTEGER(c_int) :: n_domains_p ! PE-local number of analysis domains
         end subroutine init_n_domains_pfl
     end interface
 
-     interface
+    interface
         subroutine init_dim_l_pfl(dim_l) bind(c)
-            use iso_c_binding, only: c_int
+            use iso_c_binding
             import
-            implicit none
-              INTEGER(c_int), INTENT(out) :: dim_l ! Local state dimension
+              INTEGER(c_int) :: dim_l ! Local state dimension
         end subroutine init_dim_l_pfl
     end interface
+
 
 !!$    interface
 !!$        subroutine g2l_state(domain_p, state_p, dim_l, state_l) bind(c)

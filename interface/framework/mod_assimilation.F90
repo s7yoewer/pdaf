@@ -30,12 +30,12 @@
 MODULE mod_assimilation
 
 ! !DESCRIPTION:
-! This module provides variables needed for the
+! This module provides variables needed for the 
 ! assimilation within the routines of the dummy model.
 ! For simplicity, all assimilation-related variables
 ! are stored here, even if they are only used in
 ! the main program for the filter initialization.
-! Most variables can be specified as a command line
+! Most variables can be specified as a command line 
 ! argument.
 !
 ! Implementation for TSMP-PDAF.
@@ -49,8 +49,6 @@ MODULE mod_assimilation
   SAVE
 !EOP
 
-  PUBLIC
-
 ! *** Model- and data specific variables ***
 
   INTEGER :: dim_state           ! Global model state dimension
@@ -59,15 +57,13 @@ MODULE mod_assimilation
   INTEGER :: dim_obs_p                    ! Process-local number of observations
   REAL, ALLOCATABLE    :: obs_p(:)        ! Vector holding process-local observations
   INTEGER, ALLOCATABLE :: obs_index_p(:)  ! Vector holding state-vector indices of observations
-  ! REAL, ALLOCATABLE    :: obs_f(:)        ! Vector holding full vector of observations
-  ! REAL, ALLOCATABLE :: coords_obs_f(:,:)  ! Array for full observation coordinates
 
 ! *** Variables specific for TSMP-PDAF ***
 
   ! gw
   INTEGER, ALLOCATABLE :: dim_state_p_count(:) !Vector holding local state vector dimensions for processors of a single model communicator
   ! gw end
-  REAL, ALLOCATABLE    :: obs(:)          ! Vector holding all observations for Global domain
+  REAL, ALLOCATABLE    :: obs(:)          ! Vector holding all observations for Global domain 
   INTEGER, ALLOCATABLE :: obs_index_l(:)  ! Vector holding local state-vector indices of observations
   INTEGER, ALLOCATABLE :: obs_interp_indices_p(:,:)  ! Vector holding state-vector indices of grid cells surrounding interpolation for PE-local domain
   INTEGER, ALLOCATABLE :: obs_interp_weights_p(:,:)  ! Vector holding weights of grid cells surrounding observation for PE-local domain
@@ -76,25 +72,38 @@ MODULE mod_assimilation
   ! pdaf-ordered index: determined by domain-decomposition
   ! nc-ordered index:   pure ordering of observation in NetCDF observation file
   INTEGER, ALLOCATABLE :: obs_pdaf2nc(:)  ! index mapping from a pdaf-ordered index to a nc-ordered index
-  REAL, ALLOCATABLE :: pressure_obserr_p(:) ! Vector holding observation errors for paraflow run at each PE-local domain
+  REAL, ALLOCATABLE :: pressure_obserr_p(:) ! Vector holding observation errors for paraflow run at each PE-local domain 
   !hcp
   !type :: scoltype
   !     integer, dimension(:), allocatable :: scol_obs_in
   !endtype
   integer, dimension(:,:), allocatable :: sc_p  !soil moisture of a soil column distributed over the procs of PE-local (i_z, i_obs)
-  real, allocatable    :: idx_obs_nc_p(:)
+  real, allocatable    :: idx_obs_nc_p(:)        
   INTEGER :: toffset      ! offset time step to shift all the assimilation steps
-  !end hcp
-  REAL, ALLOCATABLE :: clm_obserr_p(:)    ! Vector holding  observation errors for CLM run at each PE-local domain
+  !end hcp  
+  REAL, ALLOCATABLE :: clm_obserr_p(:)    ! Vector holding  observation errors for CLM run at each PE-local domain  
   REAL, ALLOCATABLE :: distance(:)        ! Localization distance
   INTEGER, ALLOCATABLE :: global_to_local(:)  ! Vector to map global index to local domain index
   INTEGER, ALLOCATABLE :: longxy(:), latixy(:), longxy_obs(:), latixy_obs(:) ! longitude and latitude of grid cells and observation cells
   INTEGER, ALLOCATABLE :: longxy_obs_floor(:), latixy_obs_floor(:) ! indices of grid cells with smaller lon/lat than observation location
-  INTEGER, ALLOCATABLE :: var_id_obs(:)   ! for remote sensing data the variable identifier to group
-                                          ! variables distributed over a grid surface area
+  INTEGER, ALLOCATABLE :: var_id_obs(:)   ! for remote sensing data the variable identifier to group  
+                                          ! variables distributed over a grid surface area 
   !kuw
+  INTEGER, ALLOCATABLE :: obs_id_p(:) ! ID of observation point in PE-local domain
+  INTEGER, ALLOCATABLE :: obs_nc2pdaf_deprecated(:)   ! index for mapping mstate to local domain
   INTEGER, ALLOCATABLE :: obs_nc2pdaf(:)   ! index for mapping mstate to local domain
   !kuw end
+
+
+  ! Yorck
+    
+  REAL :: da_interval_variable ! interval until next observation, used by next_observation_pdaf.F90, better solution for next assimilation time step
+  ! has to be read from observation file --> no empty observation files have to be written
+  REAL, ALLOCATABLE :: obscov(:,:) ! observation covariance matrix
+  REAL, ALLOCATABLE :: obscov_inv(:,:) ! inverse of the observation covariance matrix
+  character (len = 110) :: temp_mean_filename ! User defined filename of temporal mean
+
+  ! END Yorck
 
   ! Multi-scale DA
 
@@ -134,6 +143,10 @@ MODULE mod_assimilation
 ! ! Settings for observations - available as command line options
   INTEGER :: delt_obs      ! time step interval between assimilation steps
   REAL    :: rms_obs       ! RMS error size for observation generation
+
+  REAL    :: rms_obs_GRACE
+  REAL    :: rms_obs_SM
+
   INTEGER :: dim_obs       ! Number of observations
 
 ! ! General control of PDAF - available as command line options
@@ -171,26 +184,26 @@ MODULE mod_assimilation
                           !       There are no fixed basis/covariance cases, as
                           !       these are equivalent to LSEIK subtypes 2/3
                           !   ESTKF:
-                          !     (0) standard ESTKF
+                          !     (0) standard ESTKF 
                           !       There are no fixed basis/covariance cases, as
                           !       these are equivalent to SEIK subtypes 2/3
                           !   LESTKF:
-                          !     (0) standard LESTKF
+                          !     (0) standard LESTKF 
                           !       There are no fixed basis/covariance cases, as
                           !       these are equivalent to LSEIK subtypes 2/3
                           !   LEnKF:
                           !     (0) Standard form of EnKF with covariance localization
                           !   NETF:
-                          !     (0) standard NETF
+                          !     (0) standard NETF 
                           !   LNETF:
-                          !     (0) standard LNETF
+                          !     (0) standard LNETF 
                           !   LKNETF:
                           !     (0) HNK: 2-step LKNETF with NETF before LETKF
                           !     (1) HKN: 2-step LKNETF with LETKF before NETF
                           !     (4) HSync: LKNETF synchronous
                           !     (5) Offline mode - HNK: 2-step LKNETF with NETF before LETKF
                           !   PF:
-                          !     (0) standard PF
+                          !     (0) standard PF 
                           !   3D-Var:
                           !     (0) parameterized 3D-Var
                           !     (1) 3D Ensemble Var using LESTKF for ensemble update
@@ -251,8 +264,14 @@ MODULE mod_assimilation
                            !   (2) 5th-order polynomial weight function
   REAL    :: sradius       ! Support radius for 5th order polynomial
                            !   or radius for 1/e for exponential weighting
+
+
+  REAL    :: cradius_GRACE
+  REAL    :: sradius_GRACE
+  REAL    :: cradius_SM
+  REAL    :: sradius_SM
 !    ! SEIK-subtype4/LSEIK-subtype4/ESTKF/LESTKF
-  INTEGER :: type_sqrt     ! Type of the transform matrix square-root
+  INTEGER :: type_sqrt     ! Type of the transform matrix square-root 
                            !   (0) symmetric square root
                            !   (1) Cholesky decomposition
 !    ! NETF/LNETF
@@ -273,9 +292,9 @@ MODULE mod_assimilation
   INTEGER :: pf_res_type   ! Resampling type for PF
                            ! (1) probabilistic resampling
                            ! (2) stochastic universal resampling
-                           ! (3) residual resampling
+                           ! (3) residual resampling        
   INTEGER :: pf_noise_type    ! Resampling type for PF
-                           ! (0) no perturbations, (1) constant stddev,
+                           ! (0) no perturbations, (1) constant stddev, 
                            ! (2) amplitude of stddev relative of ensemble variance
   REAL :: pf_noise_amp     ! Noise amplitude (>=0.0, only used if pf_noise_type>0)
 !    ! 3D-Var
@@ -296,7 +315,7 @@ MODULE mod_assimilation
                                 !       (1) Fletcher-Reeves, (2) Polak-Ribiere, (3) positive Polak-Ribiere
                                 !  CG: maximum number of iterations (default=200)
   INTEGER :: solver_iparam2 = 1 ! Solver specific parameter
-                                !  LBFGS: - not used -
+                                !  LBFGS: - not used - 
                                 !  CG+: parameter irest (default=1)
                                 !       (0) no restarts; (n>0) restart every n steps
                                 !  CG: - not used -
@@ -305,7 +324,7 @@ MODULE mod_assimilation
                                 !  CG+: convergence parameter 'eps' (default=1.0e-5)
                                 !  CG: conpergence parameter 'eps' (default=1.0e-6)
   REAL :: solver_rparam2 = 1.0e+7 ! Solver specific parameter
-                                !  LBFGS: tolerance in termination test 'factr' (default=1.0e+7)
+                                !  LBFGS: tolerance in termination test 'factr' (default=1.0e+7) 
                                 !  CG+: - not used -
                                 !  CG: - not used -
 
