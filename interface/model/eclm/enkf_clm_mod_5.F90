@@ -642,9 +642,12 @@ module enkf_clm_mod
     real(r8), pointer :: psand(:,:)
     real(r8), pointer :: pclay(:,:)
     real(r8), pointer :: porgm(:,:)
-    integer :: i,j,cc=0,offset=0
+    integer :: i,j,cc,offset
     character (len = 34) :: fn    !TSMP-PDAF: function name for state vector output
     character (len = 34) :: fn2    !TSMP-PDAF: function name for swc output
+
+    cc = 0
+    offset = 0
 
     swc   => waterstate_inst%h2osoi_vol_col
     psand => soilstate_inst%cellsand_col
@@ -731,8 +734,10 @@ module enkf_clm_mod
     use shr_kind_mod, only: r8 => shr_kind_r8
     implicit none
     real(r8), pointer :: swc(:,:)
-    integer :: j,g,cc=0,c
+    integer :: j,g,cc,c
     integer :: n_c
+
+    cc = 0
 
     swc   => waterstate_inst%h2osoi_vol_col
 
@@ -794,7 +799,7 @@ module enkf_clm_mod
     use GridcellType, only: grc
     implicit none
 
-    integer :: j,g,cc=0,count,c,count_c
+    integer :: j,g,cc,count,c,count_c
     integer :: n_c
     real(r8) :: avg_sum
 
@@ -809,6 +814,8 @@ module enkf_clm_mod
     real(r8), pointer :: liq_state(:,:)
     real(r8), pointer :: ice_state(:,:)
     real(r8), pointer :: snow_state(:)
+
+    cc = 0
 
     tws_state => waterstate_inst%tws_state_before
     liq_state => waterstate_inst%h2osoi_liq_state_before
@@ -1069,7 +1076,9 @@ module enkf_clm_mod
     character (len = 32) :: fn5    !TSMP-PDAF: function name for state vector outpu
     character (len = 32) :: fn6    !TSMP-PDAF: function name for state vector outpu
 
-    logical :: swc_zero_before_update = .false.
+    logical :: swc_zero_before_update
+
+    swc_zero_before_update = .false.
 
 #ifdef PDAF_DEBUG
     IF(clmt_printensemble == tstartcycle .OR. clmt_printensemble < 0) THEN
@@ -1168,12 +1177,15 @@ module enkf_clm_mod
     real(r8)  :: watmin_set        ! minimum soil moisture for setting swc (mm)
     real(r8)  :: swc_update        ! updated SWC in loop
 
-    integer :: i,j,cc=0
+    integer :: i,j,cc
     character (len = 31) :: fn2    !TSMP-PDAF: function name for state vector outpu
     character (len = 32) :: fn3    !TSMP-PDAF: function name for state vector outpu
     character (len = 32) :: fn4    !TSMP-PDAF: function name for state vector outpu
 
-    logical :: swc_zero_before_update = .false.
+    logical :: swc_zero_before_update
+
+    cc = 0
+    swc_zero_before_update = .false.
 
     swc   => waterstate_inst%h2osoi_vol_col
     watsat => soilstate_inst%watsat_col
@@ -1358,11 +1370,14 @@ module enkf_clm_mod
     integer,intent(in) :: tstartcycle
     integer,intent(in) :: mype
 
-    integer :: i,j,cc=0,offset=0
+    integer :: i,j,cc,offset
 
     real(r8), pointer :: psand(:,:)
     real(r8), pointer :: pclay(:,:)
     real(r8), pointer :: porgm(:,:)
+
+    cc = 0
+    offset = 0
 
     psand   => soilstate_inst%cellsand_col
     pclay   => soilstate_inst%cellclay_col
