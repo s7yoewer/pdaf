@@ -24,13 +24,15 @@
 
 module enkf_clm_mod
 
-  use iso_c_binding
+  use iso_c_binding, only: c_int, c_double, c_char
 
 ! !USES:
   use shr_kind_mod    , only : r8 => shr_kind_r8, SHR_KIND_CL
 
 ! !ARGUMENTS:
     implicit none
+
+    public
 
 #if (defined CLMSA)
   integer :: COMM_model_clm
@@ -66,12 +68,12 @@ module enkf_clm_mod
   integer, allocatable :: num_layer_columns(:)
   integer :: num_hactiveg, num_hactivec
 
-  integer, allocatable :: hactiveg_levels(:,:)     ! hydrolocial active filter for all levels (gridcell) 
-  integer, allocatable :: hactivec_levels(:,:)     ! hydrolocial active filter for all levels (column) 
+  integer, allocatable :: hactiveg_levels(:,:)     ! hydrolocial active filter for all levels (gridcell)
+  integer, allocatable :: hactivec_levels(:,:)     ! hydrolocial active filter for all levels (column)
   integer, allocatable :: gridcell_state(:)
 
 
-  ! OMI --> I want to update the observation type after each observation comes in. 
+  ! OMI --> I want to update the observation type after each observation comes in.
   ! problem: the observation type is updated before the update of the assimilation
   ! this causes the wrong observation type to be used in the update
 
@@ -87,7 +89,7 @@ module enkf_clm_mod
 
 
   ! end Yorck
-  
+
 #endif
   integer(c_int),bind(C,name="clmprint_et")       :: clmprint_et
   integer(c_int),bind(C,name="clmstatevec_allcol")       :: clmstatevec_allcol
@@ -103,7 +105,7 @@ module enkf_clm_mod
   real(r8) :: dtime     ! time step increment (sec)
   integer  :: ier       ! error code
 
-  character(kind=c_char,len=100),bind(C,name="outdir"),target :: outdir
+  character(kind=c_char),dimension(100),bind(C,name="outdir"),target :: outdir
 
   logical  :: log_print    ! true=> print diagnostics
   real(r8) :: eccf         ! earth orbit eccentricity factor
@@ -115,8 +117,8 @@ module enkf_clm_mod
   logical :: flag
   integer(c_int),bind(C,name="clmprefixlen") :: clmprefixlen
   integer :: COMM_couple_clm    ! CLM-version of COMM_couple
-                                ! (currently not used for clm5_0)
-  logical :: newgridcell        !only clm5_0
+                                ! (currently not used for eclm)
+  logical :: newgridcell        !only eclm
 
   contains
 
@@ -157,36 +159,36 @@ module enkf_clm_mod
     obs_type_update_texture = clmupdate_texture
 
     ! soil water content observations - case 1
-    if(clmupdate_swc.eq.1) then
+    if(clmupdate_swc==1) then
       call define_clm_statevec_swc
     end if
 
     ! soil water content observations - case 2
-    if(clmupdate_swc.eq.2) then
+    if(clmupdate_swc==2) then
       error stop "Not implemented: clmupdate_swc.eq.2"
     end if
 
     ! texture observations - case 1
-    if(clmupdate_texture.eq.1) then
+    if(clmupdate_texture==1) then
       clm_statevecsize = clm_statevecsize + 2*((endg-begg+1)*nlevsoi)
     end if
 
     ! texture observations - case 2
-    if(clmupdate_texture.eq.2) then
+    if(clmupdate_texture==2) then
       clm_statevecsize = clm_statevecsize + 3*((endg-begg+1)*nlevsoi)
     end if
 
     ! soil temperature observations --> Visakh can add his stuff here
-    if(clmupdate_T.eq.1) then
+    if(clmupdate_T==1) then
       error stop "Not implemented: clmupdate_T.eq.1"
     end if
 
     ! TWS observations
-    if (clmupdate_tws.eq.1) then
+    if (clmupdate_tws==1) then
       call define_clm_statevec_tws
     end if
 
-    ! 
+    !
 
       ! Include your own state vector definitions here for different variables (ET, LAI, etc.)
 
@@ -261,10 +263,10 @@ module enkf_clm_mod
     end do
 
     ! All column variables in state vector
-    if(clmstatevec_allcol.eq.1) then
+    if(clmstatevec_allcol==1) then
 
       ! Only hydrologically active columns
-      if(clmstatevec_only_active .eq. 1) then
+      if(clmstatevec_only_active == 1) then
 
         cc = 0
 
@@ -299,7 +301,7 @@ module enkf_clm_mod
     else
 
       ! Only hydrologically active columns
-      if(clmstatevec_only_active.eq.1) then
+      if(clmstatevec_only_active==1) then
 
         cc = 0
 
@@ -345,7 +347,7 @@ module enkf_clm_mod
     end if
 
     ! 2) COL/GRC: STATEVECSIZE
-    if(clmstatevec_only_active.eq.1) then
+    if(clmstatevec_only_active==1) then
       ! Use iterator cc for setting state vector size.
       !
       ! Set `clm_varsize`, even though it is currently not used
@@ -353,7 +355,7 @@ module enkf_clm_mod
       clm_varsize      =  cc
       clm_statevecsize =  cc
     else
-      if(clmstatevec_allcol.eq.1) then
+      if(clmstatevec_allcol==1) then
         ! #cols * #levels
         clm_varsize      =  (endc-begc+1) * nlevsoi
         clm_statevecsize =  (endc-begc+1) * nlevsoi
@@ -468,7 +470,7 @@ module enkf_clm_mod
 
       g = col%gridcell(c) ! gridcell of column
 
-      if ((exclude_greenland.eq.0) .or. (.not.(lon(g)<330 .and. lon(g)>180 .and. lat(g)>55))) then ! greenland can be excluded from the statevector
+      if ((exclude_greenland==0) .or. (.not.(lon(g)<330 .and. lon(g)>180 .and. lat(g)>55))) then ! greenland can be excluded from the statevector
 
         if (col%hydrologically_active(c)) then ! if the column is hydrologically active, add it, if the corresponding gridcell is not found before, add also the gridcell
 
@@ -478,11 +480,11 @@ module enkf_clm_mod
 
             do j = 1,nlevsoi ! add gridcell for each layer until bedrock
               ! get number in layers
-  
+
               if (j<=col%nbedrock(c)) then
                 num_layer(j) = num_layer(j) + 1
               end if
-  
+
             end do
 
             num_hactiveg = num_hactiveg + 1
@@ -522,7 +524,7 @@ module enkf_clm_mod
       do c = clm_begc, clm_endc
         g = col%gridcell(c) ! gridcell of column
 
-        if ((exclude_greenland.eq.0) .or. (.not.(lon(g)<330 .and. lon(g)>180 .and. lat(g)>55))) then
+        if ((exclude_greenland==0) .or. (.not.(lon(g)<330 .and. lon(g)>180 .and. lat(g)>55))) then
 
           if (col%hydrologically_active(c)) then
 
@@ -541,7 +543,7 @@ module enkf_clm_mod
               fa = fa + 1
               hactivec_levels(fa,j) = c
             end if
-            
+
           end if
 
         end if
@@ -560,7 +562,7 @@ module enkf_clm_mod
     clm_statevecsize = 0
 
     select case (state_setup)
-    case(0) 
+    case(0)
       ! all compartments in state vector, liq and ice added up to not run into balancing errors due to different partioning
       ! in different ensemble members in these variables even if the total amount of water is similar
 
@@ -607,7 +609,7 @@ module enkf_clm_mod
       ! one variable for snow
       clm_varsize_tws(4) = num_layer(1)
       clm_statevecsize = clm_statevecsize + num_layer(1)
-    
+
     end select
 
   end subroutine define_clm_statevec_tws
@@ -649,13 +651,13 @@ module enkf_clm_mod
     pclay => soilstate_inst%cellclay_col
     porgm => soilstate_inst%cellorg_col
 
-    
+
 
 
 #ifdef PDAF_DEBUG
     IF(clmt_printensemble == tstartcycle + 1 .OR. clmt_printensemble < 0) THEN
 
-      IF(clmupdate_swc.NE.0) THEN
+      IF(clmupdate_swc/=0) THEN
         ! TSMP-PDAF: Debug output of CLM swc
         WRITE(fn2, "(a,i5.5,a,i5.5,a)") "swcstate_", mype, ".integrate.", tstartcycle + 1, ".txt"
         OPEN(unit=71, file=fn2, action="write")
@@ -666,34 +668,34 @@ module enkf_clm_mod
     END IF
 #endif
 
-    if(clmupdate_swc.eq.1) then
+    if(clmupdate_swc==1) then
       call set_clm_statevec_swc
     end if
 
     ! calculate shift when CRP data are assimilated
-    if(clmupdate_swc.eq.2) then
+    if(clmupdate_swc==2) then
       error stop "Not implemented clmupdate_swc.eq.2"
     endif
 
     !hcp  LAI
-    if(clmupdate_T.eq.1) then
+    if(clmupdate_T==1) then
       error stop "Not implemented: clmupdate_T.eq.1"
     endif
     !end hcp  LAI
 
     ! write average swc to state vector (CRP assimilation)
-    if(clmupdate_swc.eq.2) then
+    if(clmupdate_swc==2) then
       error stop "Not implemented: clmupdate_swc.eq.2"
     endif
 
     ! write texture values to state vector (if desired)
-    if(clmupdate_texture.ne.0) then
+    if(clmupdate_texture/=0) then
       cc = 1
       do i=1,nlevsoi
         do j=clm_begg,clm_endg
           clm_statevec(cc+1*clm_varsize+offset) = psand(j,i)
           clm_statevec(cc+2*clm_varsize+offset) = pclay(j,i)
-          if(clmupdate_texture.eq.2) then
+          if(clmupdate_texture==2) then
             !incl. organic matter values
             clm_statevec(cc+3*clm_varsize+offset) = porgm(j,i)
           end if
@@ -702,7 +704,7 @@ module enkf_clm_mod
       end do
     endif
 
-    if (clmupdate_tws.eq.1) then
+    if (clmupdate_tws==1) then
       call set_clm_statevec_tws
     end if
 
@@ -734,7 +736,7 @@ module enkf_clm_mod
 
     swc   => waterstate_inst%h2osoi_vol_col
 
-    if (clmstatevec_colmean.eq.1) then
+    if (clmstatevec_colmean==1) then
 
       do cc = 1, clm_statevecsize
 
@@ -748,7 +750,7 @@ module enkf_clm_mod
         ! Loop over all columns
         do c=clm_begc,clm_endc
           ! Select columns in gridcell g
-          if(col%gridcell(c).eq.g) then
+          if(col%gridcell(c)==g) then
             ! Select hydrologically active columns
             if(col%hydrologically_active(c)) then
               ! Add active column to swc-sum
@@ -791,7 +793,7 @@ module enkf_clm_mod
     use PatchType, only: patch
     use GridcellType, only: grc
     implicit none
-    
+
     integer :: j,g,cc=0,count,c,count_c
     integer :: n_c
     real(r8) :: avg_sum
@@ -816,25 +818,25 @@ module enkf_clm_mod
     select case (TWS_smoother)
 
     case(0) ! instantaneous values
-      liq => waterstate_inst%h2osoi_liq_col 
+      liq => waterstate_inst%h2osoi_liq_col
       ice => waterstate_inst%h2osoi_ice_col
-      snow => waterstate_inst%h2osno_col 
+      snow => waterstate_inst%h2osno_col
       sfc => waterstate_inst%h2osfc_col
       can => waterstate_inst%h2ocan_patch
       TWS => waterstate_inst%tws_hactive
     case(1) ! monthly means
-      liq => waterstate_inst%h2osoi_liq_col_mean 
+      liq => waterstate_inst%h2osoi_liq_col_mean
       ice => waterstate_inst%h2osoi_ice_col_mean
-      snow => waterstate_inst%h2osno_col_mean  
+      snow => waterstate_inst%h2osno_col_mean
       sfc => waterstate_inst%h2osfc_col_mean
       can => waterstate_inst%h2ocan_patch_mean
       TWS => waterstate_inst%tws_hactive_mean
     end select
 
-    select case (state_setup) 
+    select case (state_setup)
       case(0) ! all compartments in state vector
         cc = 1
-        do j = 1,nlevsoi 
+        do j = 1,nlevsoi
           do count = 1, num_layer(j)
             g = hactiveg_levels(count,j)
 
@@ -856,7 +858,7 @@ module enkf_clm_mod
 
             gridcell_state(cc) = g
 
-            if (j==1) then ! for the first layer, we can fill the other compartments            
+            if (j==1) then ! for the first layer, we can fill the other compartments
 
               ! snow
               clm_statevec(cc+sum(clm_varsize_tws(1:2))) = 0.0
@@ -932,7 +934,7 @@ module enkf_clm_mod
 
             end do
 
-            if (n_c.ne.0) then
+            if (n_c/=0) then
 
               clm_statevec(cc) = clm_statevec(cc) + avg_sum / real(n_c, r8)
 
@@ -966,7 +968,7 @@ module enkf_clm_mod
               end if
             end do
 
-            if (n_c.ne.0) then
+            if (n_c/=0) then
 
               clm_statevec(cc+clm_varsize_tws(1)) = clm_statevec(cc+clm_varsize_tws(1)) + avg_sum / real(n_c, r8)
 
@@ -999,7 +1001,7 @@ module enkf_clm_mod
               end if
             end do
 
-            if (n_c.ne.0) then
+            if (n_c/=0) then
 
               clm_statevec(cc+sum(clm_varsize_tws(1:2))) = clm_statevec(cc+sum(clm_varsize_tws(1:2))) + avg_sum / real(n_c, r8)
 
@@ -1087,7 +1089,7 @@ module enkf_clm_mod
 #ifdef PDAF_DEBUG
     IF(clmt_printensemble == tstartcycle .OR. clmt_printensemble < 0) THEN
 
-      IF(obs_type_update_swc.NE.0) THEN
+      IF(obs_type_update_swc/=0) THEN
         ! TSMP-PDAF: For debug runs, output the state vector in files
         WRITE(fn5, "(a,i5.5,a,i5.5,a)") "h2osoi_liq", mype, ".bef_up.", tstartcycle, ".txt"
         OPEN(unit=71, file=fn5, action="write")
@@ -1105,7 +1107,7 @@ module enkf_clm_mod
 #endif
 
     ! calculate shift when CRP data are assimilated
-    if(obs_type_update_swc.eq.2) then
+    if(obs_type_update_swc==2) then
       error stop "Not implemented: clmupdate_swc.eq.2"
     endif
 
@@ -1115,22 +1117,22 @@ module enkf_clm_mod
     call update_DA_nstep()
 
     ! write updated swc back to CLM
-    if(obs_type_update_swc.ne.0) then
+    if(obs_type_update_swc/=0) then
       call update_swc(tstartcycle, mype)
     endif
 
     !hcp: TG, TV
-    if(obs_type_update_T.EQ.1) then
+    if(obs_type_update_T==1) then
       error stop "Not implemented: clmupdate_T.eq.1"
     endif
     ! end hcp TG, TV
 
     ! write updated texture back to CLM
-    if(obs_type_update_texture.ne.0) then
+    if(obs_type_update_texture/=0) then
       call update_texture(tstartcycle, mype)
     endif
 
-    if (obs_type_update_tws.eq.1) then
+    if (obs_type_update_tws==1) then
       call clm_update_tws
     end if
 
@@ -1188,11 +1190,11 @@ module enkf_clm_mod
 
     ! Set minimum soil moisture for checking the state vector and
     ! for setting minimum swc for CLM
-    if(clmwatmin_switch.eq.3) then
+    if(clmwatmin_switch==3) then
       ! CLM3.5 type watmin
       watmin_check = 0.00
       watmin_set = 0.05
-    else if(clmwatmin_switch.eq.5) then
+    else if(clmwatmin_switch==5) then
       ! CLM5.0 type watmin
       watmin_check = watmin
       watmin_set = watmin
@@ -1225,9 +1227,9 @@ module enkf_clm_mod
           ! If snow is masked, update only, when snow depth is less than 1mm
           if( (.not. clmswc_mask_snow) .or. snow_depth(j) < 0.001 ) then
           ! Update only those SWCs that are not excluded by ispval
-          if(state_clm2pdaf_p(j,i) .ne. ispval) then
+          if(state_clm2pdaf_p(j,i) /= ispval) then
 
-            if(swc(j,i).eq.0.0) then
+            if(swc(j,i)==0.0) then
               swc_zero_before_update = .true.
 
               ! Zero-SWC leads to zero denominator in computation of
@@ -1243,7 +1245,7 @@ module enkf_clm_mod
               !h2osoi_vol(c,j) = h2osoi_liq(c,j)/(dz(c,j)*denh2o) + h2osoi_ice(c,j)/(dz(c,j)*denice)
             end if
 
-            if (clmstatevec_colmean.eq.1) then
+            if (clmstatevec_colmean==1) then
               ! If there is no significant increment, do not
               ! implement any update / check.
               !
@@ -1252,7 +1254,7 @@ module enkf_clm_mod
               ! moistures. For variables with very small values in
               ! the state vector, this would have to be adapted
               ! (e.g. to relative difference).
-              if( abs(clm_statevec(state_clm2pdaf_p(j,i)) - clm_statevec_orig(state_clm2pdaf_p(j,i))) .le. 1.0e-7) then
+              if( abs(clm_statevec(state_clm2pdaf_p(j,i)) - clm_statevec_orig(state_clm2pdaf_p(j,i))) <= 1.0e-7) then
                 cycle
               end if
 
@@ -1265,9 +1267,9 @@ module enkf_clm_mod
               swc_update = clm_statevec(state_clm2pdaf_p(j,i))
             end if
 
-            if(swc_update.le.watmin_check) then
+            if(swc_update<=watmin_check) then
               swc(j,i) = watmin_set
-            else if(swc_update.ge.watsat(j,i)) then
+            else if(swc_update>=watsat(j,i)) then
               swc(j,i) = watsat(j,i)
             else
               swc(j,i)   = swc_update
@@ -1344,7 +1346,7 @@ module enkf_clm_mod
 
   end subroutine update_swc
 
-    
+
 
   subroutine update_texture(tstartcycle, mype)
     use clm_varpar   , only : nlevsoi
@@ -1371,7 +1373,7 @@ module enkf_clm_mod
       do j=clm_begg,clm_endg
         psand(j,i) = clm_statevec(cc+1*clm_varsize+offset)
         pclay(j,i) = clm_statevec(cc+2*clm_varsize+offset)
-        if(clmupdate_texture.eq.2) then
+        if(clmupdate_texture==2) then
           ! incl. organic matter
           porgm(j,i) = clm_statevec(cc+3*clm_varsize+offset)
         end if
@@ -1430,26 +1432,26 @@ module enkf_clm_mod
 
     subroutine assign_pointers()
 
-      liq         => waterstate_inst%h2osoi_liq_col 
-      ice         => waterstate_inst%h2osoi_ice_col 
-      swc         => waterstate_inst%h2osoi_vol_col 
+      liq         => waterstate_inst%h2osoi_liq_col
+      ice         => waterstate_inst%h2osoi_ice_col
+      swc         => waterstate_inst%h2osoi_vol_col
       dz          => col%dz
       zi          => col%zi
       z           => col%z
-      watsat      => soilstate_inst%watsat_col 
-      snow        => waterstate_inst%h2osno_col 
-      snow_depth  => waterstate_inst%snow_depth_col 
-      snl         => col%snl 
+      watsat      => soilstate_inst%watsat_col
+      snow        => waterstate_inst%h2osno_col
+      snow_depth  => waterstate_inst%snow_depth_col
+      snl         => col%snl
 
       select case (TWS_smoother)
       case(0)
-        liq_mean => waterstate_inst%h2osoi_liq_col 
+        liq_mean => waterstate_inst%h2osoi_liq_col
         ice_mean => waterstate_inst%h2osoi_ice_col
-        snow_mean => waterstate_inst%h2osno_col 
+        snow_mean => waterstate_inst%h2osno_col
       case default
-        liq_mean => waterstate_inst%h2osoi_liq_col_mean 
+        liq_mean => waterstate_inst%h2osoi_liq_col_mean
         ice_mean => waterstate_inst%h2osoi_ice_col_mean
-        snow_mean => waterstate_inst%h2osno_col_mean     
+        snow_mean => waterstate_inst%h2osno_col_mean
       end select
 
       liq_inc => waterstate_inst%h2osoi_liq_col_inc
@@ -1724,11 +1726,11 @@ module enkf_clm_mod
 
       inc_col=inc
       if (inc_col /= inc_col) inc_col = 0.0
-      
-      if (abs(inc_col).gt.max_inc*snow(c)) inc_col = sign(max_inc*snow(c),inc_col)
+
+      if (abs(inc_col)>max_inc*snow(c)) inc_col = sign(max_inc*snow(c),inc_col)
       inc_col = snow(c) + inc_col
       scale = inc_col / snow(c)
-      snow(c) = inc_col 
+      snow(c) = inc_col
       do j = 0, snl(c)+1, -1
         liq(c,j) = liq(c,j)*scale
         ice(c,j) = ice(c,j)*scale
@@ -1797,11 +1799,11 @@ module enkf_clm_mod
          clay = pclay(c,lev)
          sand = psand(c,lev)
 
-         if(sand.le.0.0) sand = 1.0
-         if(clay.le.0.0) clay = 1.0
+         if(sand<=0.0) sand = 1.0
+         if(clay<=0.0) clay = 1.0
 
          ttot = sand + clay
-         if(ttot.gt.100) then
+         if(ttot>100) then
              sand = sand/ttot * 100.0
              clay = clay/ttot * 100.0
          end if
@@ -1809,10 +1811,10 @@ module enkf_clm_mod
          pclay(c,lev) = clay
          psand(c,lev) = sand
 
-         if(clmupdate_texture.eq.2) then
+         if(clmupdate_texture==2) then
            orgm = (porgm(c,lev) / CNParamsShareInst%organic_max) * 100.0
-           if(orgm.le.0.0) orgm = 0.0
-           if(orgm.ge.100.0) orgm = 100.0
+           if(orgm<=0.0) orgm = 0.0
+           if(orgm>=100.0) orgm = 100.0
            porgm(c,lev) = (orgm / 100.0)* CNParamsShareInst%organic_max
          end if
 
@@ -1829,40 +1831,40 @@ module enkf_clm_mod
     use CNSharedParamsMod, only : CNParamsShareInst
     implicit none
 
-    real(r8)           :: om_tkm         = 0.25_r8      
+    real(r8), parameter           :: om_tkm         = 0.25_r8
     ! thermal conductivity of organic soil (Farouki, 1986) [W/m/K]
-    real(r8)           :: om_watsat_lake = 0.9_r8       
+    real(r8), parameter           :: om_watsat_lake = 0.9_r8
     ! porosity of organic soil
-    real(r8)           :: om_hksat_lake  = 0.1_r8       
+    real(r8), parameter           :: om_hksat_lake  = 0.1_r8
     ! saturated hydraulic conductivity of organic soil [mm/s]
-    real(r8)           :: om_sucsat_lake = 10.3_r8      
+    real(r8), parameter           :: om_sucsat_lake = 10.3_r8
     ! saturated suction for organic matter (Letts, 2000)
-    real(r8)           :: om_b_lake      = 2.7_r8       
+    real(r8), parameter           :: om_b_lake      = 2.7_r8
     ! Clapp Hornberger paramater for oragnic soil (Letts, 2000) (lake)
-    real(r8)           :: om_watsat                     
+    real(r8)           :: om_watsat
     ! porosity of organic soil
-    real(r8)           :: om_hksat                      
+    real(r8)           :: om_hksat
     ! saturated hydraulic conductivity of organic soil [mm/s]
-    real(r8)           :: om_sucsat                     
+    real(r8)           :: om_sucsat
     ! saturated suction for organic matter (mm)(Letts, 2000)
-    real(r8)           :: om_csol        = 2.5_r8       
+    real(r8), parameter           :: om_csol        = 2.5_r8
     ! heat capacity of peat soil *10^6 (J/K m3) (Farouki, 1986)
-    real(r8)           :: om_tkd         = 0.05_r8      
+    real(r8), parameter           :: om_tkd         = 0.05_r8
     ! thermal conductivity of dry organic soil (Farouki, 1981)
-    real(r8)           :: om_b                          
+    real(r8)           :: om_b
     ! Clapp Hornberger paramater for oragnic soil (Letts, 2000)
-    real(r8)           :: zsapric        = 0.5_r8
+    real(r8), parameter           :: zsapric        = 0.5_r8
     ! depth (m) that organic matter takes on characteristics of sapric peat
-    real(r8)           :: pcalpha        = 0.5_r8       ! percolation threshold
-    real(r8)           :: pcbeta         = 0.139_r8     ! percolation exponent
+    real(r8), parameter           :: pcalpha        = 0.5_r8       ! percolation threshold
+    real(r8), parameter           :: pcbeta         = 0.139_r8     ! percolation exponent
     real(r8)           :: perc_frac    ! "percolating" fraction of organic soil
     real(r8)           :: perc_norm    ! normalize to 1 when 100% organic soil
     real(r8)           :: uncon_hksat  ! series conductivity of mineral/organic soil
     real(r8)           :: uncon_frac   ! fraction of "unconnected" soil
     real(r8)           :: bd           ! bulk density of dry soil material [kg/m^3]
-    real(r8)           :: tkm          ! mineral conductivity 
+    real(r8)           :: tkm          ! mineral conductivity
     real(r8)           :: xksat        ! maximum hydraulic conductivity of soil [mm/s]
-    
+
     integer  :: ipedof,c,lev
     real(r8) :: clay,sand,om_frac
     real(r8), pointer :: psand(:,:)
@@ -1893,18 +1895,18 @@ module enkf_clm_mod
 
          soilstate_inst%bd_col(c,lev) = &
               (1._r8 - soilstate_inst%watsat_col(c,lev))*2.7e3_r8
-         
+
          soilstate_inst%watsat_col(c,lev) = &
               (1._r8 - om_frac) * soilstate_inst%watsat_col(c,lev) + om_watsat*om_frac
-         
-         tkm = (1._r8 - om_frac) * (8.80_r8*sand+2.92_r8*clay)/(sand+clay)+om_tkm*om_frac 
+
+         tkm = (1._r8 - om_frac) * (8.80_r8*sand+2.92_r8*clay)/(sand+clay)+om_tkm*om_frac
          ! W/(m K)
          soilstate_inst%bsw_col(c,lev) = &
-              (1._r8-om_frac) * (2.91_r8 + 0.159_r8*clay) + om_frac*om_b   
-         
+              (1._r8-om_frac) * (2.91_r8 + 0.159_r8*clay) + om_frac*om_b
+
          soilstate_inst%sucsat_col(c,lev) = &
-              (1._r8-om_frac) * soilstate_inst%sucsat_col(c,lev) + om_sucsat*om_frac  
-         
+              (1._r8-om_frac) * soilstate_inst%sucsat_col(c,lev) + om_sucsat*om_frac
+
          soilstate_inst%hksat_min_col(c,lev) = xksat
 
          ! perc_frac is zero unless perf_frac greater than percolation threshold
@@ -1932,7 +1934,7 @@ module enkf_clm_mod
              (perc_frac*om_frac)*om_hksat
 
          soilstate_inst%tkmg_col(c,lev)   = tkm ** (1._r8 - &
-             soilstate_inst%watsat_col(c,lev))           
+             soilstate_inst%watsat_col(c,lev))
 
          soilstate_inst%tksatu_col(c,lev) = &
              soilstate_inst%tkmg_col(c,lev)*0.57_r8**soilstate_inst%watsat_col(c,lev)
@@ -1940,7 +1942,7 @@ module enkf_clm_mod
          soilstate_inst%tkdry_col(c,lev)  = &
              ((0.135_r8*soilstate_inst%bd_col(c,lev) + 64.7_r8) / &
              (2.7e3_r8 - 0.947_r8*soilstate_inst%bd_col(c,lev)) &
-             )*(1._r8-om_frac) + om_tkd*om_frac  
+             )*(1._r8-om_frac) + om_tkd*om_frac
 
          soilstate_inst%csol_col(c,lev)   = &
              ((1._r8-om_frac)*(2.128_r8*sand+2.385_r8*clay) / (sand+clay) + &
@@ -1949,12 +1951,12 @@ module enkf_clm_mod
          soilstate_inst%watdry_col(c,lev) = &
              soilstate_inst%watsat_col(c,lev) * &
              (316230._r8/soilstate_inst%sucsat_col(c,lev)  &
-             ) ** (-1._r8/soilstate_inst%bsw_col(c,lev)) 
+             ) ** (-1._r8/soilstate_inst%bsw_col(c,lev))
 
-         soilstate_inst%watopt_col(c,lev) = & 
+         soilstate_inst%watopt_col(c,lev) = &
              soilstate_inst%watsat_col(c,lev) * &
              (158490._r8/soilstate_inst%sucsat_col(c,lev)  &
-             ) ** (-1._r8/soilstate_inst%bsw_col(c,lev)) 
+             ) ** (-1._r8/soilstate_inst%bsw_col(c,lev))
 
          ! secspday (day/sec)
          soilstate_inst%watfc_col(c,lev) = &
@@ -2013,7 +2015,7 @@ module enkf_clm_mod
 
     ! beg and end gridcell
     call get_proc_bounds(begg=begg, endg=endg)
-    
+
    !print *,'ni, nj ', ni, nj
    !print *,'cells per processor ', ncells
    !print *,'begg, endg ', begg, endg
@@ -2027,7 +2029,7 @@ module enkf_clm_mod
     ! initialize vector with zero values
     longxy(:) = 0
     latixy(:) = 0
-  
+
     ! fill vector with index values
     counter = 1
     do ii = 1, nj
@@ -2203,8 +2205,8 @@ module enkf_clm_mod
     ! clm_endg, etc)
     call get_proc_bounds(begg=begg, endg=endg, begc=begc, endc=endc)
 
-    if(clmupdate_swc.eq.1) then
-      if(clmstatevec_allcol.eq.1) then
+    if(clmupdate_swc==1) then
+      if(clmstatevec_allcol==1) then
         ! Each column is a local domain
         ! -> DIM_L: number of layers in column
         n_domains_p = endc - begc + 1
@@ -2213,13 +2215,13 @@ module enkf_clm_mod
         ! -> DIM_L: number of layers in gridcell
         n_domains_p = endg - begg + 1
       end if
-    elseif (clmupdate_tws.ne.1) then
+    elseif (clmupdate_tws/=1) then
       ! Process-local number of gridcells Default, possibly not tested
       ! for other updates except SWC
       n_domains_p = endg - begg + 1
     end if
 
-    if (clmupdate_tws.ne.1) then
+    if (clmupdate_tws/=1) then
 
       ! If only_active: Use clm2pdaf to check which columsn/gridcells
       ! are inside. Possibly: number of columns/gridcells reduced by
@@ -2236,13 +2238,13 @@ module enkf_clm_mod
         state_loc2clm_c_p(domain_p) = ispval
       end do
 
-      if(clmstatevec_only_active .eq. 1) then
+      if(clmstatevec_only_active == 1) then
 
         ! Reset n_domains_p
         n_domains_p = 0
         domain_p = 0
 
-        if(clmstatevec_allcol .eq. 1) then
+        if(clmstatevec_allcol == 1) then
           ! COLUMNS
 
           ! Each hydrologically active layer is a local domain
@@ -2287,7 +2289,7 @@ module enkf_clm_mod
 
         ! Set state_loc2clm_c_p for non-excluding hydrologically
         ! inactive cols/grcs
-        if(clmstatevec_allcol .eq. 1) then
+        if(clmstatevec_allcol == 1) then
           ! COLUMNS
           do domain_p=1,n_domains_p
             state_loc2clm_c_p(domain_p) = clm_begc + domain_p - 1
@@ -2330,8 +2332,8 @@ module enkf_clm_mod
 
     integer :: g, i, count
 
-    if(clmupdate_swc.eq.1) then
-      if(clmstatevec_only_active .eq. 1) then
+    if(clmupdate_swc==1) then
+      if(clmstatevec_only_active == 1) then
         ! Compare nlevsoi to clmstatevec_max_layer and bedrock if
         ! "hydrologically active" is turned on
         dim_l = min(nlevsoi, clmstatevec_max_layer, col%nbedrock(state_loc2clm_c_p(domain_p)))
@@ -2342,21 +2344,21 @@ module enkf_clm_mod
       end if
     endif
 
-    if(clmupdate_swc.eq.2) then
+    if(clmupdate_swc==2) then
       error stop "Not implemented: clmupdate_swc.eq.2"
       ! dim_l = nlevsoi + 1
       ! nshift = nlevsoi + 1
     endif
 
-    if(clmupdate_texture.eq.1) then
+    if(clmupdate_texture==1) then
       dim_l = 2*nlevsoi + nshift
     endif
 
-    if(clmupdate_texture.eq.2) then
+    if(clmupdate_texture==2) then
       dim_l = 3*nlevsoi + nshift
     endif
 
-    if (clmupdate_tws.eq.1) then
+    if (clmupdate_tws==1) then
       dim_l = 0
       g = hactiveg_levels(domain_p,1)
 
@@ -2369,28 +2371,28 @@ module enkf_clm_mod
             end if
           end do
         end do
-    
+
         ! snow and surface water
         dim_l = dim_l+2
-    
-        if (clm_varsize_tws(5).ne.0) then
+
+        if (clm_varsize_tws(5)/=0) then
           dim_l = dim_l+1
         end if
 
       case(1) ! only TWS in statevector
-    
+
         dim_l=1
 
       case(2) ! aggregated setup
-    
+
         dim_l=2
-    
+
         do count = 1, num_layer(4)
           if (g==hactiveg_levels(count,4)) then
             dim_l = dim_l+1
           end if
         end do
-    
+
         do count = 1, num_layer(13)
           if (g==hactiveg_levels(count,13)) then
             dim_l = dim_l+1
@@ -2432,7 +2434,7 @@ module enkf_clm_mod
     !   nshift_p = domain_p + i * n_domain
     !   state_l(i+1) = state_p(nshift_p)
     ! ENDDO
-    if (clmupdate_tws.ne.1) then
+    if (clmupdate_tws/=1) then
       ! Column index inside gridcell index domain_p
       DO i = 1, dim_l
         ! Column index from DOMAIN_P via STATE_LOC2CLM_C_P
@@ -2441,7 +2443,7 @@ module enkf_clm_mod
       END DO
     else
 
-      if (clm_varsize_tws(5).ne.0) then
+      if (clm_varsize_tws(5)/=0) then
         sub=3
       else
         sub=2
@@ -2453,7 +2455,7 @@ module enkf_clm_mod
         do i = 1, dim_l-sub
           do j = 1, num_layer(i)
             if (g==hactiveg_levels(j,i)) then
-              if (i == 1) then 
+              if (i == 1) then
                 state_l(i) = state_p(j)
               else
                 state_l(i) = state_p(j + sum(num_layer(1:i-1)))
@@ -2526,7 +2528,7 @@ module enkf_clm_mod
   !>    Source is STATE_L, the local vector.
   subroutine l2g_state_clm(domain_p, dim_l, state_l, dim_p, state_p)
 
-    use ColumnType , only : col 
+    use ColumnType , only : col
 
     implicit none
 
@@ -2549,7 +2551,7 @@ module enkf_clm_mod
     !   nshift_p = domain_p + i * n_domain
     !   state_p(nshift_p) = state_l(i+1)
     ! ENDDO
-    if (clmupdate_tws.eq.0) then
+    if (clmupdate_tws==0) then
       ! Column index inside gridcell index domain_p
 
       DO i = 1, dim_l
@@ -2559,7 +2561,7 @@ module enkf_clm_mod
       END DO
     else
 
-      if (clm_varsize_tws(5).ne.0) then
+      if (clm_varsize_tws(5)/=0) then
         sub=3
       else
         sub=2

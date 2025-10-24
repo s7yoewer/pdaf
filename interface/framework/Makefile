@@ -64,7 +64,7 @@ LIBS += -L$(MODELDIR) $(TSMPPDAFLIBS)
 # Rules et al.
 ######################################################
 
-.SUFFIXES: .c .F90 .o
+.SUFFIXES: .c .F90 .o 
 
 # Modules used for the model part
 MODULES =  	mod_tsmp.o
@@ -134,7 +134,7 @@ $(PROG) : $(LIBMODEL) libpdaf-d.a \
 
 ######################################################
 
-libpdaf-d.a:
+libpdaf-d.a: 
 	@echo "++++++ Generate Filter library +++++++"
 
 #	@cd $(BASEDIR)/src; make;
@@ -157,4 +157,4 @@ cleanpdaf:
 	cd $(BASEDIR)/src; make clean
 
 depend .depend:
-	mpif90 -M *.F90 > .depend
+	mpif90 -M *.F90 > .depend 

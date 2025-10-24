@@ -23,9 +23,12 @@
 !-------------------------------------------------------------------------------------------
 
 module mod_read_obs
-  use iso_C_binding
+  use iso_C_binding, only: c_int, c_ptr, c_loc
 
   implicit none
+
+  public
+
   integer, allocatable :: idx_obs_nc(:)
   integer, allocatable :: x_idx_obs_nc(:)
   integer, allocatable :: y_idx_obs_nc(:)
@@ -113,7 +116,7 @@ contains
 
     integer :: has_obs_clm, dim_obs
 
-    
+
 
     call check( nf90_open(current_observation_filename, nf90_nowrite, ncid) )
     call check(nf90_inq_dimid(ncid, dim_name, dimid))
@@ -125,11 +128,11 @@ contains
 
         if(allocated(obs_type))   deallocate(obs_type)
         allocate(obs_type(dim_obs))
-        
+
         call check(nf90_inq_varid(ncid, type_name, obstype_varid))
         call check(nf90_get_var(ncid, obstype_varid, obs_type))
 
-        if (trim(obs_type(1)) .ne. trim(current_observation_type)) then
+        if (trim(obs_type(1)) /= trim(current_observation_type)) then
 
             dim_obs_g = 0
 
@@ -176,14 +179,14 @@ contains
             haserr = nf90_inq_varid(ncid, layer_name, clmobs_layer_varid)
             if (haserr == nf90_noerr) then
                 call check( nf90_get_var(ncid, clmobs_layer_varid, layer_obs_g) )
-            else    
+            else
                 layer_obs_g(:) = 1
             end if
 
             call check( nf90_inq_varid(ncid, dr_name, dr_varid) )
             call check( nf90_get_var(ncid, dr_varid, dr_obs_g) )
 
-            haserr = nf90_inq_varid(ncid, obserr_name, clmobserr_varid) 
+            haserr = nf90_inq_varid(ncid, obserr_name, clmobserr_varid)
 
             if(haserr == nf90_noerr) then
 
@@ -226,7 +229,16 @@ contains
     use mod_tsmp, &
         only: point_obs, obs_interp_switch, is_dampfac_state_time_dependent, &
         is_dampfac_param_time_dependent, crns_flag
-    use netcdf
+    use netcdf, only: nf90_max_name
+    use netcdf, only: nf90_open
+    use netcdf, only: nf90_nowrite
+    use netcdf, only: nf90_inq_dimid
+    use netcdf, only: nf90_inquire_dimension
+    use netcdf, only: nf90_inq_varid
+    use netcdf, only: nf90_get_var
+    use netcdf, only: nf90_noerr
+    use netcdf, only: nf90_strerror
+    use netcdf, only: nf90_close
     implicit none
     integer :: ncid
     character (len = *), parameter :: dim_name = "dim_obs"
@@ -265,7 +277,7 @@ contains
     character (len = *), parameter :: y_idx_interp_d_name = "iy_interp_d"
     integer :: has_obs_pf
     integer :: has_depth
-#endif    
+#endif
 #endif
 
     ! CLM
@@ -302,7 +314,7 @@ contains
     ! Multi-scale data assimilation
     ! ----------------------------
     ! Not point observations, see TSMP-PDAF manual entry for input `point_obs`
-    if(point_obs .eq. 0) then
+    if(point_obs == 0) then
         call check(nf90_inq_dimid(ncid, dim_nx_name, dimid))
         call check(nf90_inquire_dimension(ncid, dimid, recorddimname, dim_nx))
         if (screen > 2) then
@@ -390,7 +402,7 @@ contains
         end if
 
         !check, if observation errors are present in observation file
-        haserr = nf90_inq_varid(ncid, presserr_name, presserr_varid) 
+        haserr = nf90_inq_varid(ncid, presserr_name, presserr_varid)
         if(haserr == nf90_noerr) then
             multierr = 1
             !hcp pressure_obserr must be reallocated because dim_obs is not necessary
@@ -436,13 +448,13 @@ contains
 
         call check( nf90_inq_varid(ncid, Z_IDX_NAME, z_idx_varid) )
         call check( nf90_get_var(ncid, z_idx_varid, z_idx_obs_nc) )
-        !hcp     
-        if  (crns_flag .EQ. 1) then
+        !hcp
+        if  (crns_flag == 1) then
             z_idx_obs_nc(:)=1
             !if ((maxval(z_idx_obs_nc).NE.1) .OR. (minval(z_idx_obs_nc).NE.1)) then
             !   write(*,*) 'For crns average mode parflow obs layer iz must be 1'
             !   stop
-            !endif 
+            !endif
         endif
         !end hcp
         if (screen > 2) then
@@ -450,7 +462,7 @@ contains
         end if
 
         ! Read observation distances to input observation grid point
-        if (obs_interp_switch .eq. 1) then
+        if (obs_interp_switch == 1) then
             if(allocated(x_idx_interp_d_obs_nc)) deallocate(x_idx_interp_d_obs_nc)
             allocate(x_idx_interp_d_obs_nc(dim_obs))
 
@@ -490,7 +502,7 @@ contains
         end if
 
         !check, if observation errors are present in observation file
-        haserr = nf90_inq_varid(ncid, obserr_name, clmobserr_varid) 
+        haserr = nf90_inq_varid(ncid, obserr_name, clmobserr_varid)
         if(haserr == nf90_noerr) then
             multierr = 1
             if(allocated(clm_obserr)) deallocate(clm_obserr)
@@ -583,7 +595,14 @@ contains
   subroutine get_obsindex_currentobsfile(no_obs) bind(c,name='get_obsindex_currentobsfile')
     USE mod_tsmp, ONLY: tcycle
     USE mod_assimilation, only: obs_filename
-    use netcdf
+    use netcdf, only: nf90_max_name
+    use netcdf, only: nf90_open
+    use netcdf, only: nf90_nowrite
+    use netcdf, only: nf90_inq_dimid
+    use netcdf, only: nf90_inquire_dimension
+    use netcdf, only: nf90_inq_varid
+    use netcdf, only: nf90_get_var
+    use netcdf, only: nf90_close
 
     implicit none
     integer, intent(out) :: no_obs
@@ -660,8 +679,8 @@ contains
     !if(allocated(y_idx_obs_nc))deallocate(y_idx_obs_nc)
     !if(allocated(z_idx_obs_nc))deallocate(z_idx_obs_nc)
     !kuw: clean clm observations
-    IF (.NOT. filtertype == 8) THEN
-      ! For LEnKF lat/lon are used
+    IF (.NOT. filtertype == 5 .AND. .NOT. filtertype == 7 .AND. .NOT. filtertype == 8) THEN
+      ! For LETKF, LESTKF, LEnKF lat/lon are used
       if(allocated(clmobs_lon))deallocate(clmobs_lon)
       if(allocated(clmobs_lat))deallocate(clmobs_lat)
     END IF
@@ -695,7 +714,7 @@ contains
   !> @param[in] fn Filename of the observation file
   !> @param[out] nn number of observations in `fn`
   !> @details
-  !>     Reads the content of the variable (!) named `no_obs` from 
+  !>     Reads the content of the variable (!) named `no_obs` from
   !>     NetCDF file `fn`.
   !>
   !>     Uses  subroutines from the NetCDF module.
@@ -728,6 +747,47 @@ contains
 
   end subroutine check_n_observationfile
 
+  !> @author Yorck Ewerdwalbesloh, Johannes Keller
+  !> @date 11.09.2023
+  !> @brief Return data assimilation interval from file
+  !> @param[in] fn Filename of the observation file
+  !> @param[out] aa new da_interval (number of time steps until next assimilation time step)
+  !> @details
+  !>     Reads the content of the variable name `da_interval` from NetCDF
+  !>     file `fn` using subroutines from the NetCDF module.
+  !>     The result is returned in `aa`.
+  !>
+  !>     The result is used to adapt the da_interval until the next observation file.
+  !>
+  !>     Adapted for TSMP-PDAF by Johannes Keller, 28.05.2025.
+  subroutine check_n_observationfile_da_interval(fn,aa)
+    use shr_kind_mod, only: r8 => shr_kind_r8
+    use netcdf, only: nf90_max_name, nf90_open, nf90_nowrite, &
+      nf90_inq_varid, nf90_get_var, nf90_close, nf90_noerr
+
+    implicit none
+
+    character(len=*),intent(in) :: fn
+    real, intent(out)        :: aa
+
+
+    integer :: ncid, varid, status !,dimid
+    character (len = *), parameter :: varname = "da_interval"
+    real(r8) :: dtime ! land model time step (sec)
+
+    !character (len = *), parameter :: dim_name = "dim_obs"
+    !character(len = nf90_max_name) :: recorddimname
+
+    call check(nf90_open(fn, nf90_nowrite, ncid))
+    !call check(nf90_inq_dimid(ncid, dim_name, dimid))
+    !call check(nf90_inquire_dimension(ncid, dimid, recorddimname, nn))
+
+    call check( nf90_inq_varid(ncid, varname, varid))
+    call check( nf90_get_var(ncid, varid, aa) )
+    call check(nf90_close(ncid))
+
+  end subroutine check_n_observationfile_da_interval
+
   !> @author Wolfgang Kurtz, Guowei He, Mukund Pondkule
   !> @date 03.03.2023
   !> @brief Error handling for netCDF commands
@@ -737,7 +797,8 @@ contains
   !> an error message if necessary.
   subroutine check(status)
 
-    use netcdf
+    use netcdf, only: nf90_noerr
+    use netcdf, only: nf90_strerror
     integer, intent ( in) :: status
 
     if(status /= nf90_noerr) then
@@ -747,56 +808,56 @@ contains
   end subroutine check
 
 
-  !> @author Yorck Ewerdwalbesloh
-      !> @date 11.09.2023
-      !> @brief Return data assimilation interval from file
-      !> @param[in] fn Filename of the observation file
-      !> @param[out] nn number of hours until next assimilation time step
-      !> @details
-      !>     Reads the content of the variable name `da_interval_variable` from NetCDF
-      !>     file `fn` using subroutines from the NetCDF module.
-      !>     The result is returned in `nn`.
-      !>
-      !>     The result is used to decide if the next observation file is
-      !>     used or not.
-    subroutine check_n_observationfile_da_interval(fn,nn)
-        use shr_kind_mod, only: r8 => shr_kind_r8
-        use netcdf, only: nf90_max_name, nf90_open, nf90_nowrite, &
-            nf90_inq_varid, nf90_get_var, nf90_close, nf90_noerr
-        use clm_varcon, only: ispval
-        use clm_time_manager, only : get_step_size
+  ! !> @author Yorck Ewerdwalbesloh
+  !     !> @date 11.09.2023
+  !     !> @brief Return data assimilation interval from file
+  !     !> @param[in] fn Filename of the observation file
+  !     !> @param[out] nn number of hours until next assimilation time step
+  !     !> @details
+  !     !>     Reads the content of the variable name `da_interval_variable` from NetCDF
+  !     !>     file `fn` using subroutines from the NetCDF module.
+  !     !>     The result is returned in `nn`.
+  !     !>
+  !     !>     The result is used to decide if the next observation file is
+  !     !>     used or not.
+  !   subroutine check_n_observationfile_da_interval(fn,nn)
+  !       use shr_kind_mod, only: r8 => shr_kind_r8
+  !       use netcdf, only: nf90_max_name, nf90_open, nf90_nowrite, &
+  !           nf90_inq_varid, nf90_get_var, nf90_close, nf90_noerr
+  !       use clm_varcon, only: ispval
+  !       use clm_time_manager, only : get_step_size
 
-        implicit none
+  !       implicit none
 
-        character(len=*),intent(in) :: fn
-        real, intent(out)        :: nn
-        
+  !       character(len=*),intent(in) :: fn
+  !       real, intent(out)        :: nn
 
-        integer :: ncid, varid, status !,dimid
-        character (len = *), parameter :: varname = "da_interval_variable"
-        real(r8) :: dtime ! land model time step (sec)
 
-        !character (len = *), parameter :: dim_name = "dim_obs"
-        !character(len = nf90_max_name) :: recorddimname
+  !       integer :: ncid, varid, status !,dimid
+  !       character (len = *), parameter :: varname = "da_interval_variable"
+  !       real(r8) :: dtime ! land model time step (sec)
 
-        dtime = get_step_size()
+  !       !character (len = *), parameter :: dim_name = "dim_obs"
+  !       !character(len = nf90_max_name) :: recorddimname
 
-        call check(nf90_open(fn, nf90_nowrite, ncid))
-        !call check(nf90_inq_dimid(ncid, dim_name, dimid))
-        !call check(nf90_inquire_dimension(ncid, dimid, recorddimname, nn))
-        status = nf90_inq_varid(ncid, varname, varid)
-        if (status == nf90_noerr) then
-            call check(nf90_inq_varid(ncid, varname, varid))
-            call check( nf90_get_var(ncid, varid, nn) )     
-            call check(nf90_close(ncid))
-            ! at this point: half hourly time steps, this is adjusted here. In the GRACE files, da_interval is set up as hours
-            ! --> is adjusted using information from inside CLM
-            nn = nn*INT(3600/dtime)
-        else
-            nn = ispval
-        end if
+  !       dtime = get_step_size()
 
-    end subroutine check_n_observationfile_da_interval
+  !       call check(nf90_open(fn, nf90_nowrite, ncid))
+  !       !call check(nf90_inq_dimid(ncid, dim_name, dimid))
+  !       !call check(nf90_inquire_dimension(ncid, dimid, recorddimname, nn))
+  !       status = nf90_inq_varid(ncid, varname, varid)
+  !       if (status == nf90_noerr) then
+  !           call check(nf90_inq_varid(ncid, varname, varid))
+  !           call check( nf90_get_var(ncid, varid, nn) )
+  !           call check(nf90_close(ncid))
+  !           ! at this point: half hourly time steps, this is adjusted here. In the GRACE files, da_interval is set up as hours
+  !           ! --> is adjusted using information from inside CLM
+  !           nn = nn*INT(3600/dtime)
+  !       else
+  !           nn = ispval
+  !       end if
+
+  !   end subroutine check_n_observationfile_da_interval
 
 
 
@@ -838,11 +899,11 @@ contains
         status = nf90_inq_varid(ncid, varname, varid)
         if (status == nf90_noerr) then
             call check(nf90_inq_varid(ncid, varname, varid))
-            call check( nf90_get_var(ncid, varid, nn) )     
+            call check( nf90_get_var(ncid, varid, nn) )
             call check(nf90_close(ncid))
             ! at this point: half hourly time steps, this is adjusted here. In the GRACE files, set_zero is set up as hours
             ! --> is adjusted using information from inside CLM
-            if (nn.ne.ispval) then
+            if (nn/=ispval) then
                 nn = nn*INT(3600/dtime)
             end if
         else
@@ -874,7 +935,7 @@ contains
 
         if(allocated(obs_type_lok))   deallocate(obs_type_lok)
         allocate(obs_type_lok(dim_obs))
-        
+
         obs_type_str = ''
 
         status = nf90_inq_varid(ncid, "type_clm", obstype_varid)
@@ -921,7 +982,7 @@ contains
 
     subroutine domain_def_clm(lon_clmobs, lat_clmobs, dim_obs, &
         longxy, latixy, longxy_obs, latixy_obs)
- 
+
         use spmdMod,   only : npes, iam
         use domainMod, only : ldomain, lon1d, lat1d
         use decompMod, only : get_proc_total, get_proc_bounds, ldecomp
@@ -946,15 +1007,15 @@ contains
         real :: minlon, minlat, maxlon, maxlat
         real(r8), pointer :: lon(:)
         real(r8), pointer :: lat(:)
-    
+
         real(r8), allocatable :: longxy_obs_lokal(:), latixy_obs_lokal(:)
-    
+
         INTEGER, allocatable :: in_mpi_(:,:), out_mpi_(:,:)
-    
+
         integer :: begg, endg   ! per-proc gridcell ending gridcell indices
-    
+
         real(r8) :: lat1, lon1, lat2, lon2, a, c, R, pi
-    
+
         real(r8) :: dist
         real(r8), allocatable :: min_dist(:)
         integer, allocatable :: min_g(:)
@@ -963,33 +1024,33 @@ contains
 
         integer :: lok_lon, lok_lat
 
-    
-    
+
+
         lon   => grc%londeg
         lat   => grc%latdeg
-    
-    
+
+
         ni = ldomain%ni
         nj = ldomain%nj
-    
+
         ! get total number of gridcells, landunits,
         ! columns, patches and cohorts on processor
-    
+
         call get_proc_total(iam, ncells, nlunits, ncols, npatches, ncohorts)
-    
+
         ! beg and end gridcell
         call get_proc_bounds(begg=begg, endg=endg)
-    
+
         if (allocated(longxy)) deallocate(longxy)
         if (allocated(latixy)) deallocate(latixy)
         allocate(longxy(num_hactiveg), stat=ier)
         allocate(latixy(num_hactiveg), stat=ier)
 
-    
+
         longxy(:) = 0
         latixy(:) = 0
 
-    
+
         counter = 1
         do ii = 1, nj
             do jj = 1, ni
@@ -1003,44 +1064,44 @@ contains
                     end if
                 end do
             end do
-        end do 
-    
+        end do
+
         if (allocated(min_dist)) deallocate(min_dist)
         allocate(min_dist(dim_obs))
         min_dist(:) = huge(1.0d0)
-    
+
         if (allocated(min_g)) deallocate(min_g)
         allocate(min_g(dim_obs))
-    
+
         R = 6371.0
         pi = 3.14159265358979323846
         do i = 1, dim_obs
             do g = begg, endg
-        
-                ! check distance from each grid point to observation location --> take the coordinate in local system that equals 
+
+                ! check distance from each grid point to observation location --> take the coordinate in local system that equals
                 ! the one of the closest coordinate
                 lat1 = lat(g) * pi / 180.0
                 lon1 = lon(g) * pi / 180.0
                 lat2 = lat_clmobs(i) * pi / 180.0
                 lon2 = lon_clmobs(i) * pi / 180.0
-        
+
                 a = sin((lat2 - lat1) / 2)**2 + cos(lat1) * cos(lat2) * sin((lon2 - lon1) / 2)**2
                 c = 2 * atan2(sqrt(a), sqrt(1 - a))
                 dist = R * c
-        
+
                 if (dist < min_dist(i)) then
                     min_dist(i) = dist
                     min_g(i) = g
-                end if 
+                end if
             end do
         end do
-    
-    
+
+
         IF (ALLOCATED(in_mpi_)) DEALLOCATE(in_mpi_)
         ALLOCATE(in_mpi_(2,dim_obs))
         IF (ALLOCATED(out_mpi_)) DEALLOCATE(out_mpi_)
         ALLOCATE(out_mpi_(2,dim_obs))
-    
+
         in_mpi_(1,:) = int(ceiling(min_dist))
         in_mpi_(2,:) = min_g
 
@@ -1098,8 +1159,8 @@ contains
             print*, "longxy_obs = ", longxy_obs
             print*, "latixy_obs = ", latixy_obs
         end if
- 
-    end subroutine
+
+    end subroutine domain_def_clm
 
 
 end module mod_read_obs

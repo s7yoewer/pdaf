@@ -32,8 +32,8 @@
 SUBROUTINE assimilate_pdaf()
 
 ! !DESCRIPTION:
-! This routine is called during the model integrations at each time 
-! step. It check whether the forecast phase is completed. If so, 
+! This routine is called during the model integrations at each time
+! step. It check whether the forecast phase is completed. If so,
 ! PDAF_put_state_X is called to perform the analysis step.
 !
 ! !REVISION HISTORY:
@@ -63,9 +63,9 @@ SUBROUTINE assimilate_pdaf()
 
 
 ! ! External subroutines
-! !  (subroutine names are passed over to PDAF in the calls to 
-! !  PDAF_get_state and PDAF_assimilate_X. This allows the user 
-! !  to specify the actual name of a routine. However, the 
+! !  (subroutine names are passed over to PDAF in the calls to
+! !  PDAF_get_state and PDAF_assimilate_X. This allows the user
+! !  to specify the actual name of a routine. However, the
 ! !  PDAF-internal name of a subroutine might be different from
 ! !  the external name!)
 !
@@ -123,7 +123,7 @@ SUBROUTINE assimilate_pdaf()
     init_dim_obs_l_pdafomi, &      ! Get dimension of obs. vector for local analysis domain
     localize_covar_pdafomi         ! Apply localization to covariance matrix in LEnKF
 
-  
+
 
 
 ! *** Switch on debug output ***
@@ -247,6 +247,6 @@ ENDIF
   CALL PDAF_set_debug_flag(0)
 #endif
 
-  
+
 
 END SUBROUTINE assimilate_pdaf

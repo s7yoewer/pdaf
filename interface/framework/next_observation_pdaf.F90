@@ -36,15 +36,15 @@ SUBROUTINE next_observation_pdaf(stepnow, nsteps, doexit, time)
 ! Used in the filters: SEIK/EnKF/LSEIK/ETKF/LETKF/ESTKF/LESTKF
 !
 ! The subroutine is called before each forecast phase
-! by PDAF\_get\_state. It has to initialize the number 
-! of time steps until the next available observation 
-! (nsteps) and the current model time (time). In 
+! by PDAF\_get\_state. It has to initialize the number
+! of time steps until the next available observation
+! (nsteps) and the current model time (time). In
 ! addition the exit flag (exit) has to be initialized.
-! It indicates if the data assimilation process is 
-! completed such that the ensemble loop in the model 
+! It indicates if the data assimilation process is
+! completed such that the ensemble loop in the model
 ! routine can be exited.
 !
-! The routine is called by all processes. 
+! The routine is called by all processes.
 !
 ! !REVISION HISTORY:
 ! 2013-09 - Lars Nerger - Initial code
@@ -86,7 +86,7 @@ SUBROUTINE next_observation_pdaf(stepnow, nsteps, doexit, time)
   character (len = 110) :: fn
   character(len=32) :: obs_type_str
   !kuw end
-  
+
   time = 0.0    ! Not used in fully-parallel implementation variant
   doexit = 0
   nstep = get_nstep()
@@ -97,15 +97,15 @@ SUBROUTINE next_observation_pdaf(stepnow, nsteps, doexit, time)
   end if
 
   ! Read steps until next observation from current observation file
-  if (stepnow.eq.toffset) then
+  if (stepnow==toffset) then
     set_averaging_to_zero = 0
     if (mype_world==0 .and. screen > 2) then
       write(*,*)'next_observation_pdaf: da_interval from enkfpf.par'
-    end if 
+    end if
   else
     write(fn, '(a, i5.5)') trim(obs_filename)//'.', stepnow
     call check_n_observationfile_da_interval(fn,da_interval_variable)
-    if (da_interval_variable.ne.ispval) then
+    if (da_interval_variable/=ispval) then
       da_interval = da_interval_variable
     end if
     call check_n_observationfile_set_zero(fn, set_averaging_to_zero)
@@ -117,7 +117,7 @@ SUBROUTINE next_observation_pdaf(stepnow, nsteps, doexit, time)
     write(*,*)'da_interval (in next_observation_pdaf):',da_interval
   end if
 
-  if (set_averaging_to_zero.ne.ispval) then
+  if (set_averaging_to_zero/=ispval) then
     set_averaging_to_zero = set_averaging_to_zero+nstep
   end if
 
@@ -125,7 +125,7 @@ SUBROUTINE next_observation_pdaf(stepnow, nsteps, doexit, time)
     write(*,*) 'set_averaging_to_zero (in next_observation_pdaf):',set_averaging_to_zero
   end if
 
-  if (stepnow.eq.toffset) then
+  if (stepnow==toffset) then
     if (mype_world==0 .and. screen > 2) then
       write(*,*)'next_observation_pdaf: observation type from enkfpf.par'
     end if

@@ -2109,6 +2109,7 @@ END SUBROUTINE PDAFomi_gather_obs_f2_flex
 ! *****************************************
 ! *** Gather all observation dimensions ***
 ! *****************************************
+
     ALLOCATE(obsdims(npes,n_obstypes))
 
     DO i = 1, n_obstypes

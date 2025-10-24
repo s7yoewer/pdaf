@@ -27,7 +27,7 @@
 !!
 !! These 2 routines need to be adapted for the particular observation type:
 !! * init_dim_obs_OBSTYPE \n
-!!           Count number of process-local and full observations; 
+!!           Count number of process-local and full observations;
 !!           initialize vector of observations and their inverse variances;
 !!           initialize coordinate array and index array for indices of
 !!           observed elements of the state vector.
@@ -35,7 +35,7 @@
 !!           observation operator to get full observation vector of this type. Here
 !!           one has to choose a proper observation operator or implement one.
 !!
-!! In addition, there are two optional routines, which are required if filters 
+!! In addition, there are two optional routines, which are required if filters
 !! with localization are used:
 !! * init_dim_obs_l_OBSTYPE \n
 !!           Only required if domain-localized filters (e.g. LESTKF, LETKF) are used:
@@ -56,10 +56,12 @@ MODULE obs_GRACE_pdafomi
          ONLY: mype_filter    ! Rank of filter process
     USE PDAFomi, &
          ONLY: obs_f, obs_l   ! Declaration of observation data types
-   
+
     IMPLICIT NONE
     SAVE
-  
+
+    PUBLIC
+
     ! Variables which are inputs to the module (usually set in init_pdaf)
     LOGICAL :: assim_GRACE        !< Whether to assimilate this data type
     REAL    :: rms_obs_GRACE      !< Observation error standard deviation (for constant errors)
@@ -73,16 +75,16 @@ MODULE obs_GRACE_pdafomi
     real, allocatable :: lat_temp_mean(:,:) ! corresponding latitude
 
     INTEGER, ALLOCATABLE :: longxy(:), latixy(:), longxy_obs(:), latixy_obs(:) ! longitude and latitude of grid cells and observation cells
-  
+
     ! One can declare further variables, e.g. for file names which can
     ! be use-included in init_pdaf() and initialized there.
-  
-  
+
+
   ! *********************************************************
   ! *** Data type obs_f defines the full observations by  ***
   ! *** internally shared variables of the module         ***
   ! *********************************************************
-  
+
   ! Relevant variables that can be modified by the user:
   !   TYPE obs_f
   !      ---- Mandatory variables to be set in INIT_DIM_OBS ----
@@ -99,39 +101,39 @@ MODULE obs_GRACE_pdafomi
   !
   !      ---- Variables with predefined values - they can be changed in INIT_DIM_OBS  ----
   !      INTEGER :: obs_err_type=0            ! Type of observation error: (0) Gauss, (1) Laplace
-  !      INTEGER :: use_global_obs=1          ! Whether to use (1) global full obs. 
+  !      INTEGER :: use_global_obs=1          ! Whether to use (1) global full obs.
   !                                           ! or (0) obs. restricted to those relevant for a process domain
   !      REAL :: inno_omit=0.0                ! Omit obs. if squared innovation larger this factor times
   !                                           !     observation variance
   !      REAL :: inno_omit_ivar=1.0e-12       ! Value of inverse variance to omit observation
   !   END TYPE obs_f
-  
+
   ! Data type obs_l defines the local observations by internally shared variables of the module
-  
+
   ! ***********************************************************************
-  
+
   ! Declare instances of observation data types used here
   ! We use generic names here, but one could rename the variables
     TYPE(obs_f), TARGET, PUBLIC :: thisobs      ! full observation
     TYPE(obs_l), TARGET, PUBLIC :: thisobs_l    ! local observation
-  
+
   !$OMP THREADPRIVATE(thisobs_l)
-  
-  
+
+
   !-------------------------------------------------------------------------------
-  
+
   CONTAINS
-  
+
   !> Initialize information on the module-type observation
   !!
   !! The routine is called by each filter process.
-  !! at the beginning of the analysis step before 
+  !! at the beginning of the analysis step before
   !! the loop through all local analysis domains.
-  !! 
+  !!
   !! It has to count the number of observations of the
   !! observation type handled in this module according
-  !! to the current time step for all observations 
-  !! required for the analyses in the loop over all local 
+  !! to the current time step for all observations
+  !! required for the analyses in the loop over all local
   !! analysis domains on the PE-local state domain.
   !!
   !! The following four variables have to be initialized in this routine
@@ -147,14 +149,14 @@ MODULE obs_GRACE_pdafomi
   !! * thisobs\%use_global obs - Whether to use global observations or restrict the observations to the relevant ones
   !!                          (default: 1=use global full observations)
   !! * thisobs\%inno_omit   - Omit obs. if squared innovation larger this factor times observation variance
-  !!                          (default: 0.0, omission is active if >0) 
+  !!                          (default: 0.0, omission is active if >0)
   !! * thisobs\%inno_omit_ivar - Value of inverse variance to omit observation
   !!                          (default: 1.0e-12, change this if this value is not small compared to actual obs. error)
   !!
   !! Further variables are set when the routine PDAFomi_gather_obs is called.
   !!
     SUBROUTINE init_dim_obs_GRACE(step, dim_obs)
-  
+
       USE PDAFomi, &
            ONLY: PDAFomi_gather_obs
       USE mod_assimilation, &
@@ -177,13 +179,13 @@ MODULE obs_GRACE_pdafomi
        ONLY: mype_world
 
       use decompMod , only : get_proc_bounds
-  
+
       IMPLICIT NONE
-  
+
   ! *** Arguments ***
       INTEGER, INTENT(in)    :: step       !< Current time step
       INTEGER, INTENT(inout) :: dim_obs    !< Dimension of full observation vector
-  
+
   ! *** Local variables ***
       INTEGER :: i, j, count_points, c, l, k     ! Counters
       INTEGER :: cnt, cnt0                 ! Counters
@@ -192,10 +194,10 @@ MODULE obs_GRACE_pdafomi
       REAL, ALLOCATABLE :: obs_p(:)        ! PE-local observation vector
       REAL, ALLOCATABLE :: obs_g(:)        ! Global observation vector
       REAL, ALLOCATABLE :: ivar_obs_p(:)   ! PE-local inverse observation error variance
-      REAL, ALLOCATABLE :: ocoord_p(:,:)   ! PE-local observation coordinates 
+      REAL, ALLOCATABLE :: ocoord_p(:,:)   ! PE-local observation coordinates
       CHARACTER(len=2) :: stepstr          ! String for time step
       character (len = 110) :: current_observation_filename
-      
+
 
       character(len=20) :: obs_type_name ! name of observation type (e.g. GRACE, SM, ST, ...)
 
@@ -223,27 +225,27 @@ MODULE obs_GRACE_pdafomi
 
       real :: deltax, deltay
 
-  
-  
+
+
   ! *********************************************
   ! *** Initialize full observation dimension ***
   ! *********************************************
-  
+
       !IF (mype_filter==0) &
-      IF (mype_filter==0) & 
+      IF (mype_filter==0) &
         WRITE (*,*) 'Assimilate observations - obs type GRACE'
-  
+
       ! Store whether to assimilate this observation type (used in routines below)
 
       IF (assim_GRACE) thisobs%doassim = 1
       ! Specify type of distance computation
       thisobs%disttype = 0   ! 0=Cartesian
-  
+
       ! Number of coordinates used for distance computation
       ! The distance compution starts from the first row
       thisobs%ncoord = 2
-  
-  
+
+
   ! **********************************
   ! *** Read PE-local observations ***
   ! **********************************
@@ -255,8 +257,8 @@ MODULE obs_GRACE_pdafomi
 
       obs_type_name = 'GRACE'
 
-      ! now call function to get observations 
-      
+      ! now call function to get observations
+
       if (mype_filter==0 .and. screen > 2) then
         write(*,*)'load observations from type GRACE'
       end if
@@ -277,11 +279,11 @@ MODULE obs_GRACE_pdafomi
         ALLOCATE(thisobs%id_obs_p(1, 1))
         thisobs%infile=0
         CALL PDAFomi_gather_obs(thisobs, dim_obs_p, obs_p, ivar_obs_p, ocoord_p, &
-           thisobs%ncoord, cradius_GRACE, dim_obs) 
+           thisobs%ncoord, cradius_GRACE, dim_obs)
         return
       end if
-      thisobs%infile=1  
-  
+      thisobs%infile=1
+
   ! ***********************************************************
   ! *** Count available observations for the process domain ***
   ! *** and initialize index and coordinate arrays.         ***
@@ -306,10 +308,10 @@ MODULE obs_GRACE_pdafomi
 
 
     ! additions for GRACE assimilation, it can be the case that not enough CLM gridpoints lie in the neighborhood of a GRACE observation
-    ! if this is the case, the GRACE observations cannot be reproduced in a satisfactory manner and is not used in the assimilation 
+    ! if this is the case, the GRACE observations cannot be reproduced in a satisfactory manner and is not used in the assimilation
     ! count grdicells that are in a certain radius. This effect is especially present when the applied GRACE resolution is high or for
     ! observation lying directly at the coast
-    
+
     lon   => grc%londeg
     lat   => grc%latdeg
 
@@ -350,7 +352,7 @@ MODULE obs_GRACE_pdafomi
         end if
     end if
 
-    vec_useObs_global = merge(vec_useObs_global,.false.,vec_numPoints_global.ge.numPoints)
+    vec_useObs_global = merge(vec_useObs_global,.false.,vec_numPoints_global>=numPoints)
     vec_useObs = vec_useObs_global
 
     if (screen > 2) then
@@ -368,7 +370,7 @@ MODULE obs_GRACE_pdafomi
 
     call mpi_allreduce(in_mpi,out_mpi, dim_obs, mpi_2integer, mpi_maxloc, comm_filter, ierror)
 
-    vec_useObs = merge(vec_useObs,.false.,out_mpi(2,:).eq.mype_filter)
+    vec_useObs = merge(vec_useObs,.false.,out_mpi(2,:)==mype_filter)
 
     IF (ALLOCATED(in_mpi)) DEALLOCATE(in_mpi)
     IF (ALLOCATED(out_mpi)) DEALLOCATE(out_mpi)
@@ -399,7 +401,7 @@ MODULE obs_GRACE_pdafomi
 
     end do
 
-    
+
 
     IF (ALLOCATED(obs_p)) DEALLOCATE(obs_p)
     ALLOCATE(obs_p(dim_obs_p))
@@ -422,15 +424,15 @@ MODULE obs_GRACE_pdafomi
             cnt_p = cnt_p+1
         end if
     end do
-  
+
     dim_obs = count(vec_useObs_global)
   ! ****************************************
   ! *** Gather global observation arrays ***
   ! ****************************************
-  
+
       CALL PDAFomi_gather_obs(thisobs, dim_obs_p, obs_p, ivar_obs_p, ocoord_p, &
-           thisobs%ncoord, cradius_GRACE, dim_obs) 
-  
+           thisobs%ncoord, cradius_GRACE, dim_obs)
+
   ! ********************
   ! *** Finishing up ***
   ! ********************
@@ -447,14 +449,14 @@ MODULE obs_GRACE_pdafomi
             do j = begg,endg
                 outer: do l = 1,size(lon_temp_mean,1)
                     do k=1,size(lon_temp_mean,2)
-                        if (lon_temp_mean(l,k).eq.lon(j) .and. lat_temp_mean(l,k).eq.lat(j)) then
+                        if (lon_temp_mean(l,k)==lon(j) .and. lat_temp_mean(l,k)==lat(j)) then
                             tws_temp_mean_d(j) = tws_temp_mean(l,k)
                             exit outer
                         end if
                     end do
                 end do outer
 
-                if (lon(j).ne.lon_temp_mean(l,k) .or. lat(j).ne.lat_temp_mean(l,k)) then
+                if (lon(j)/=lon_temp_mean(l,k) .or. lat(j)/=lat_temp_mean(l,k)) then
                     print *, "Attention: distributing model mean to clumps does not work properly"
                     print *, "idx_lon= ",l, "idx_lat= ",k
                     print *, "lon(j)= ", lon(j),"lon_temp_mean(idx_lon)= ",lon_temp_mean(l,k)
@@ -468,23 +470,23 @@ MODULE obs_GRACE_pdafomi
             deallocate(lat_temp_mean)
 
         end if
-  
+
       ! Deallocate all local arrays
       DEALLOCATE(obs_g)
       DEALLOCATE(obs_p, ocoord_p, ivar_obs_p)
 
     END SUBROUTINE init_dim_obs_GRACE
-  
-  
-  
+
+
+
   !-------------------------------------------------------------------------------
-  !> Implementation of observation operator 
+  !> Implementation of observation operator
   !!
   !! This routine applies the full observation operator
   !! for the type of observations handled in this module.
   !!
   !! One can choose a proper observation operator from
-  !! PDAFOMI_OBS_OP or add one to that module or 
+  !! PDAFOMI_OBS_OP or add one to that module or
   !! implement another observation operator here.
   !!
   !! The routine is called by all filter processes.
@@ -508,16 +510,16 @@ MODULE obs_GRACE_pdafomi
         use mod_assimilation, only: screen
 
         use PDAFomi_obs_f, only: PDAFomi_gather_obsstate
-    
+
         IMPLICIT NONE
-  
+
         ! *** Arguments ***
         INTEGER, INTENT(in) :: dim_p                 !< PE-local state dimension
         INTEGER, INTENT(in) :: dim_obs               !< Dimension of full observed state (all observed fields)
         REAL, INTENT(in)    :: state_p(dim_p)        !< PE-local model state
         REAL, INTENT(inout) :: ostate(dim_obs)       !< Full observed state
 
-        REAL, allocatable :: tws_from_statevector(:) 
+        REAL, allocatable :: tws_from_statevector(:)
         real, allocatable :: ostate_p(:)
 
         integer :: begp, endp   ! per-proc beginning and ending pft indices
@@ -531,7 +533,7 @@ MODULE obs_GRACE_pdafomi
         REAL:: m_state_sum_global(size(vec_useObs_global))
 
         integer :: count, j, g
-  
+
         ! ******************************************************
         ! *** Apply observation operator H on a state vector ***
         ! ******************************************************
@@ -542,7 +544,7 @@ MODULE obs_GRACE_pdafomi
         ELSE
             if (allocated(ostate_p)) deallocate(ostate_p)
             ALLOCATE(ostate_p(1))
-            
+
         END IF
 
         if (thisobs%infile == 1) then ! as I need also tasks with dim_obs_p==0 to reproduce GRACE observations
@@ -613,23 +615,23 @@ MODULE obs_GRACE_pdafomi
                     g = hactiveg_levels(count,13)
                     tws_from_statevector(g) = tws_from_statevector(g) + state_p(count + clm_varsize_tws(1) + clm_varsize_tws(2))
                 end do
-            
+
             end select
 
-            
+
 
             ! subtract mean TWS to obtain TWSA model values
             do count = 1, num_layer(1)
                 g = hactiveg_levels(count,1)
                 obs_point = thisobs%id_obs_p(1, g)
                 if (obs_point /= 0) then
-                    if (tws_temp_mean_d(g).ne.spval .and. tws_from_statevector(g).ne.spval) then
+                    if (tws_temp_mean_d(g)/=spval .and. tws_from_statevector(g)/=spval) then
                         m_state_sum(obs_point) = m_state_sum(obs_point) + tws_from_statevector(g)-tws_temp_mean_d(g)
-                    else if (tws_temp_mean_d(g).eq.spval .and. .not. tws_from_statevector(g).eq.spval) then
+                    else if (tws_temp_mean_d(g)==spval .and. .not. tws_from_statevector(g)==spval) then
                         print*, "error, tws temporal mean is spval and reproduced values is not spval for g = ", g
                         print*, "reproduced = ", tws_from_statevector(g)
-                        stop    
-                    else if (.not. tws_temp_mean_d(g).eq.spval .and. tws_from_statevector(g).eq.spval) then
+                        stop
+                    else if (.not. tws_temp_mean_d(g)==spval .and. tws_from_statevector(g)==spval) then
                         print*, "error, tws temporal mean is not spval and reproduced values is spval for g = ", g
                         print*, "temp_mean = ", tws_temp_mean_d(g)
                         stop
@@ -651,11 +653,11 @@ MODULE obs_GRACE_pdafomi
         if (screen>2 .and. mype_filter==0 .and. thisobs%dim_obs_f>0) then
             write(*,*)'m_state_sum_global = ', m_state_sum_global
         end if
-      
+
     END SUBROUTINE obs_op_GRACE
-  
-  
-  
+
+
+
   !-------------------------------------------------------------------------------
   !> Initialize local information on the module-type observation
   !!
@@ -673,18 +675,18 @@ MODULE obs_GRACE_pdafomi
   !! for each observation type and  local analysis domain.
   !!
     SUBROUTINE init_dim_obs_l_GRACE(domain_p, step, dim_obs, dim_obs_l)
-  
+
       ! Include PDAFomi function
       USE PDAFomi, ONLY: PDAFomi_init_dim_obs_l
-  
+
       ! Include localization radius and local coordinates
-      USE mod_assimilation, &   
+      USE mod_assimilation, &
            ONLY: cradius_GRACE, locweight, sradius_GRACE
 
         use clm_varcon, only: spval
-  
+
       IMPLICIT NONE
-  
+
   ! *** Arguments ***
       INTEGER, INTENT(in)  :: domain_p     !< Index of current local analysis domain
       INTEGER, INTENT(in)  :: step         !< Current time step
@@ -692,15 +694,15 @@ MODULE obs_GRACE_pdafomi
       INTEGER, INTENT(inout) :: dim_obs_l  !< Local dimension of observation vector
 
       REAL :: coords_l(2)      ! Coordinates of local analysis domain
-  
-  
+
+
   ! **********************************************
   ! *** Initialize local observation dimension ***
   ! **********************************************
     ! count observations within a radius
 
     if (thisobs%infile==1) then
-      
+
       ! get coords_l --> coordinates of local analysis domain, I can just set this to the rotated CLM coordinates
       coords_l(1) = longxy(domain_p)
       coords_l(2) = latixy(domain_p)
@@ -712,11 +714,11 @@ MODULE obs_GRACE_pdafomi
 
       CALL PDAFomi_init_dim_obs_l(thisobs_l, thisobs, coords_l, &
            locweight, cradius_GRACE, sradius_GRACE, dim_obs_l)
-  
+
     END SUBROUTINE init_dim_obs_l_GRACE
-  
-  
-  
+
+
+
   !-------------------------------------------------------------------------------
   !> Perform covariance localization for local EnKF on the module-type observation
   !!
@@ -731,18 +733,18 @@ MODULE obs_GRACE_pdafomi
   !! for each observation type.
   !!
     SUBROUTINE localize_covar_GRACE(dim_p, dim_obs, HP_p, HPH, coords_p)
-  
+
       ! Include PDAFomi function
       USE PDAFomi, ONLY: PDAFomi_localize_covar
-  
+
       ! Include localization radius and local coordinates
-      USE mod_assimilation, &   
+      USE mod_assimilation, &
            ONLY: cradius_GRACE, locweight, sradius_GRACE
 
       use enkf_clm_mod, only: gridcell_state
-  
+
       IMPLICIT NONE
-  
+
   ! *** Arguments ***
       INTEGER, INTENT(in) :: dim_p                 !< PE-local state dimension
       INTEGER, INTENT(in) :: dim_obs               !< Dimension of observation vector
@@ -751,8 +753,8 @@ MODULE obs_GRACE_pdafomi
       REAL, INTENT(inout) :: coords_p(:,:)         !< Coordinates of state vector elements
 
       integer :: i
-  
-  
+
+
   ! *************************************
   ! *** Apply covariance localization ***
   ! *************************************
@@ -761,19 +763,24 @@ MODULE obs_GRACE_pdafomi
         coords_p(1,i) = longxy(gridcell_state(i))
         coords_p(2,i) = latixy(gridcell_state(i))
       end do
-        
-      
+
+
 
       CALL PDAFomi_localize_covar(thisobs, dim_p, locweight, cradius_GRACE, sradius_GRACE, &
            coords_p, HP_p, HPH)
-  
+
     END SUBROUTINE localize_covar_GRACE
 
 
 
     subroutine read_temp_mean_model(temp_mean_filename)
 
-        use netcdf
+        use netcdf, only: nf90_open
+        use netcdf, only: nf90_inq_dimid
+        use netcdf, only: nf90_inquire_dimension
+        use netcdf, only: nf90_inq_varid
+        use netcdf, only: nf90_get_var
+        use netcdf, only: nf90_close
         use mod_read_obs, only: check
 
         implicit none
@@ -787,37 +794,36 @@ MODULE obs_GRACE_pdafomi
         integer :: dimid_lon, dimid_lat, status
         integer :: haserr
         character (len = *), intent(in) :: temp_mean_filename
-  
+
         call check(nf90_open(temp_mean_filename, nf90_nowrite, ncid))
         call check(nf90_inq_dimid(ncid, dim_lon_name, dimid_lon))
         call check(nf90_inq_dimid(ncid, dim_lat_name, dimid_lat))
         call check(nf90_inquire_dimension(ncid, dimid_lon, recorddimname, dim_lon))
         call check(nf90_inquire_dimension(ncid, dimid_lat, recorddimname, dim_lat))
-        
+
         if(allocated(lon_temp_mean))deallocate(lon_temp_mean)
         if(allocated(lat_temp_mean))deallocate(lat_temp_mean)
         if(allocated(tws_temp_mean))deallocate(tws_temp_mean)
-    
+
         allocate(tws_temp_mean(dim_lon,dim_lat))
         allocate(lon_temp_mean(dim_lon,dim_lat))
         allocate(lat_temp_mean(dim_lon,dim_lat))
-    
+
         call check( nf90_inq_varid(ncid, lon_name, lon_varid))
         call check(nf90_get_var(ncid, lon_varid, lon_temp_mean))
-    
+
         call check( nf90_inq_varid(ncid, lat_name, lat_varid))
         call check(nf90_get_var(ncid, lat_varid, lat_temp_mean))
-    
+
         call check( nf90_inq_varid(ncid, tws_name, tws_varid))
         call check(nf90_get_var(ncid, tws_varid, tws_temp_mean))
-    
+
         call check( nf90_close(ncid) )
-    
-    end subroutine
-  
+
+    end subroutine read_temp_mean_model
+
   END MODULE obs_GRACE_pdafomi
 
 
-  
 
-  
+

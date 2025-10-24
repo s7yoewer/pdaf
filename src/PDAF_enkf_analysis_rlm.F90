@@ -449,7 +449,7 @@ SUBROUTINE PDAF_enkf_analysis_rlm(step, dim_p, dim_obs_p, dim_ens, rank_ana, &
         CALL PDAF_memcount(3, 'r', dim_obs * dim_ens + rank_ana + &
              2 * dim_obs * rank_ana + 8 * dim_obs)
         CALL PDAF_memcount(3, 'i', 6 * dim_obs)
-        !allocflag_b = 1
+        allocflag_b = 1
      END IF
 
      CALL PDAF_timeit(13, 'new')
@@ -689,7 +689,7 @@ SUBROUTINE PDAF_enkf_analysis_rlm(step, dim_p, dim_obs_p, dim_ens, rank_ana, &
   DEALLOCATE(resid)
   DEALLOCATE(HPH)
 
-  !IF (allocflag == 0) allocflag = 1
+  IF (allocflag == 0) allocflag = 1
 
   IF (debug>0) &
        WRITE (*,*) '++ PDAF-debug: ', debug, 'PDAF_enkf_analysis -- END'
